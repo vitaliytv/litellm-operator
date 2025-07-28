@@ -1,0 +1,36 @@
+name: Deploy Documentation
+
+on:
+  push:
+    branches: ["main"]
+    paths:
+      - "docs/**"
+      - "mkdocs.yml"
+      - ".github/workflows/docs.yml"
+  pull_request:
+    branches: ["main"]
+    paths:
+      - "docs/**"
+      - "mkdocs.yml"
+      - ".github/workflows/docs.yml"
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: Deploy docs
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v4
+
+      - name: Deploy docs
+        uses: mhausenblas/mkdocs-deploy-gh-pages@master
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Uncomment and set if you have a custom domain
+          # CUSTOM_DOMAIN: yourdomain.com
+          # Uncomment if your mkdocs.yml is not in the root directory
+          CONFIG_FILE: mkdocs.yml
+          # Uncomment if you need extra packages for dependencies
+          # EXTRA_PACKAGES: build-base
+          REQUIREMENTS: requirements.txt 

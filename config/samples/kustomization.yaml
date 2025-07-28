@@ -1,0 +1,7 @@
+## Append samples of your project ##
+resources:
+- auth_v1alpha1_virtualkey.yaml
+- auth_v1alpha1_user.yaml
+- auth_v1alpha1_team.yaml
+- auth_v1alpha1_teammemberassociation.yaml
+# +kubebuilder:scaffold:manifestskustomizesamples

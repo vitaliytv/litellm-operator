@@ -1,0 +1,182 @@
+version: 2
+
+project_name: litellm-operator
+
+before:
+  hooks:
+    # Only run go mod tidy if go.mod or go.sum changed
+    - go mod tidy
+    - go mod download
+
+builds:
+  - id: manager
+    main: ./cmd/main.go
+    binary: manager
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+    goarch:
+      - amd64
+      - arm64
+    ldflags:
+      - -s -w
+      - -X main.version={{.Version}}
+      - -X main.commit={{.Commit}}
+      - -X main.date={{.Date}}
+    flags:
+      - -trimpath
+    ignore:
+      - goos: windows
+      - goos: darwin
+
+archives:
+  - id: binaries
+    name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    files:
+      - README.md
+      - LICENSE
+      - CHANGELOG.md
+    ids:
+      - manager
+  - id: source
+    name_template: "{{ .ProjectName }}_{{ .Version }}_source"
+    meta: true
+    files:
+      - .gitignore
+      - go.mod
+      - go.sum
+      - cmd/
+      - api/
+      - internal/
+      - config/
+      - helm/
+      - docs/
+      - test/
+      - Makefile
+      - Dockerfile
+      - README.md
+      - LICENSE
+      - CHANGELOG.md
+      - CONTRIBUTING.md
+      - SECURITY.md
+      - MAINTAINERS.md
+      - PROJECT
+      - ROADMAP.md
+      - .goreleaser.yml
+      
+dockers:
+  - image_templates:
+      - "ghcr.io/{{ .Env.GITHUB_REPOSITORY_OWNER }}/{{ .ProjectName }}:{{ .Version }}-amd64"
+      - "ghcr.io/{{ .Env.GITHUB_REPOSITORY_OWNER }}/{{ .ProjectName }}:latest-amd64"
+    dockerfile: Dockerfile
+    goos: linux
+    goarch: amd64
+    use: buildx
+    build_flag_templates:
+      - "--label=org.opencontainers.image.created={{.Date}}"
+      - "--label=org.opencontainers.image.title={{.ProjectName}}"
+      - "--label=org.opencontainers.image.revision={{.FullCommit}}"
+      - "--label=org.opencontainers.image.version={{.Version}}"
+      - "--label=org.opencontainers.image.source={{.GitURL}}"
+    extra_files:
+      - go.mod
+      - go.sum
+      - api/
+      - internal/
+      - cmd/
+  - image_templates:
+      - "ghcr.io/{{ .Env.GITHUB_REPOSITORY_OWNER }}/{{ .ProjectName }}:{{ .Version }}-arm64"
+      - "ghcr.io/{{ .Env.GITHUB_REPOSITORY_OWNER }}/{{ .ProjectName }}:latest-arm64"
+    dockerfile: Dockerfile
+    goos: linux
+    goarch: arm64
+    use: buildx
+    build_flag_templates:
+      - "--label=org.opencontainers.image.created={{.Date}}"
+      - "--label=org.opencontainers.image.title={{.ProjectName}}"
+      - "--label=org.opencontainers.image.revision={{.FullCommit}}"
+      - "--label=org.opencontainers.image.version={{.Version}}"
+      - "--label=org.opencontainers.image.source={{.GitURL}}"
+    extra_files:
+      - go.mod
+      - go.sum
+      - api/
+      - internal/
+      - cmd/
+
+docker_manifests:
+  - name_template: "ghcr.io/{{ .Env.GITHUB_REPOSITORY_OWNER }}/{{ .ProjectName }}:{{ .Version }}"
+    image_templates:
+      - "ghcr.io/{{ .Env.GITHUB_REPOSITORY_OWNER }}/{{ .ProjectName }}:{{ .Version }}-amd64"
+      - "ghcr.io/{{ .Env.GITHUB_REPOSITORY_OWNER }}/{{ .ProjectName }}:{{ .Version }}-arm64"
+  - name_template: "ghcr.io/{{ .Env.GITHUB_REPOSITORY_OWNER }}/{{ .ProjectName }}:latest"
+    image_templates:
+      - "ghcr.io/{{ .Env.GITHUB_REPOSITORY_OWNER }}/{{ .ProjectName }}:latest-amd64"
+      - "ghcr.io/{{ .Env.GITHUB_REPOSITORY_OWNER }}/{{ .ProjectName }}:latest-arm64"
+
+checksum:
+  name_template: 'checksums.txt'
+
+changelog:
+  sort: asc
+  use: github
+  filters:
+    exclude:
+      - "^docs:"
+      - "^test:"
+      - "^chore:"
+      - "^ci:"
+  groups:
+    - title: Features
+      regexp: '^.*?feat(\([[:word:]]+\))??!?:.+$'
+      order: 0
+    - title: 'Bug fixes'
+      regexp: '^.*?fix(\([[:word:]]+\))??!?:.+$'
+      order: 1
+    - title: 'Performance improvements'
+      regexp: '^.*?perf(\([[:word:]]+\))??!?:.+$'
+      order: 2
+    - title: Others
+      order: 999
+
+release:
+  github:
+    owner: "{{ .Env.GITHUB_REPOSITORY_OWNER }}"
+    name: "{{ .ProjectName }}"
+  draft: false
+  prerelease: auto
+  name_template: "{{.ProjectName}} {{.Version}}"
+  header: |
+    ## LiteLLM Operator {{.Version}}
+    
+    ### Container Images
+    
+    - `ghcr.io/{{ .Env.GITHUB_REPOSITORY_OWNER }}/{{ .ProjectName }}:{{ .Version }}`
+    - `ghcr.io/{{ .Env.GITHUB_REPOSITORY_OWNER }}/{{ .ProjectName }}:latest`
+    
+    ### Installation
+    
+    #### Using Helm (Recommended)
+    
+    ```bash
+    # Authenticate with GitHub Container Registry
+    helm registry login ghcr.io -u YOUR_GITHUB_USERNAME -p YOUR_GITHUB_TOKEN
+    
+    # Install the operator from OCI registry
+    helm install litellm-operator oci://ghcr.io/{{ .Env.GITHUB_REPOSITORY_OWNER }}/charts/{{ .ProjectName }} --version {{ .Version }}
+    ```
+    
+    #### Using kubectl
+    
+    ```bash
+    # Install CRDs using kustomize
+    kubectl apply -k https://github.com/{{ .Env.GITHUB_REPOSITORY_OWNER }}/{{ .ProjectName }}/config/crd
+    
+    # Install the operator using kustomize
+    kubectl apply -k https://github.com/{{ .Env.GITHUB_REPOSITORY_OWNER }}/{{ .ProjectName }}/config/default
+    ```
+
+
+
+ 
