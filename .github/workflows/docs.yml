@@ -1,4 +1,4 @@
-name: Deploy Documentation
+name: Documentation
 
 on:
   push:
@@ -7,16 +7,10 @@ on:
       - "docs/**"
       - "mkdocs.yml"
       - ".github/workflows/docs.yml"
-  pull_request:
-    branches: ["main"]
-    paths:
-      - "docs/**"
-      - "mkdocs.yml"
-      - ".github/workflows/docs.yml"
   workflow_dispatch:
 
 jobs:
-  build:
+  deploy-documentation:
     name: Deploy docs
     runs-on: ubuntu-latest
     steps:
