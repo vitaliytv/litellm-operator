@@ -160,8 +160,17 @@ curl -X POST "http://your-litellm-endpoint/chat/completions" \
   -H "Authorization: Bearer <virtual-key-value>" \
   -H "Content-Type: application/json" \
   -d '{
-    "model": "gpt-3.5-turbo",
-    "messages": [{"role": "user", "content": "Hello!"}]
+    "model": "gpt-4o",
+    "messages": [
+      {
+        "role": "system",
+        "content": "You are a helpful software engineer. Guide the user through the solution step by step."
+      },
+      {
+        "role": "user",
+        "content": "How can I create a Kubernetes operator?"
+      }
+    ]
   }'
 ```
 
