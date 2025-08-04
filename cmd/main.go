@@ -35,9 +35,10 @@ import (
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
+	litellmv1alpha1 "github.com/bbdsoftware/litellm-operator/api/litellm/v1alpha1"
 	authv1alpha1 "github.com/bbdsoftware/litellm-operator/api/v1alpha1"
 	"github.com/bbdsoftware/litellm-operator/internal/controller"
-	"github.com/bbdsoftware/litellm-operator/internal/litellm"
+	litellmcontroller "github.com/bbdsoftware/litellm-operator/internal/controller/litellm"
 	// +kubebuilder:scaffold:imports
 )
 
@@ -50,6 +51,7 @@ func init() {
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
 
 	utilruntime.Must(authv1alpha1.AddToScheme(scheme))
+	utilruntime.Must(litellmv1alpha1.AddToScheme(scheme))
 	// +kubebuilder:scaffold:scheme
 }
 
@@ -145,38 +147,39 @@ func main() {
 		os.Exit(1)
 	}
 
-	litellmClient := litellm.NewLitellmClient(os.Getenv("LITELLM_BASE_URL"), os.Getenv("LITELLM_MASTER_KEY"))
-
 	if err = (&controller.VirtualKeyReconciler{
-		Client:            mgr.GetClient(),
-		Scheme:            mgr.GetScheme(),
-		LitellmVirtualKey: litellmClient,
+		Client: mgr.GetClient(),
+		Scheme: mgr.GetScheme(),
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "VirtualKey")
 		os.Exit(1)
 	}
 	if err = (&controller.UserReconciler{
-		Client:      mgr.GetClient(),
-		Scheme:      mgr.GetScheme(),
-		LitellmUser: litellmClient,
+		Client: mgr.GetClient(),
+		Scheme: mgr.GetScheme(),
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "User")
 		os.Exit(1)
 	}
 	if err = (&controller.TeamReconciler{
-		Client:      mgr.GetClient(),
-		Scheme:      mgr.GetScheme(),
-		LitellmTeam: litellmClient,
+		Client: mgr.GetClient(),
+		Scheme: mgr.GetScheme(),
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "Team")
 		os.Exit(1)
 	}
 	if err = (&controller.TeamMemberAssociationReconciler{
-		Client:                       mgr.GetClient(),
-		Scheme:                       mgr.GetScheme(),
-		LitellmTeamMemberAssociation: litellmClient,
+		Client: mgr.GetClient(),
+		Scheme: mgr.GetScheme(),
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "TeamMemberAssociation")
+		os.Exit(1)
+	}
+	if err := (&litellmcontroller.LiteLLMInstanceReconciler{
+		Client: mgr.GetClient(),
+		Scheme: mgr.GetScheme(),
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "LiteLLMInstance")
 		os.Exit(1)
 	}
 	// +kubebuilder:scaffold:builder

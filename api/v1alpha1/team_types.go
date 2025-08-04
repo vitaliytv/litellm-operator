@@ -32,10 +32,50 @@ type TeamMemberWithRole struct {
 	Role string `json:"role,omitempty"`
 }
 
+// ConnectionRef defines how to connect to a LiteLLM instance
+type ConnectionRef struct {
+	// SecretRef references a secret containing connection details
+	SecretRef *SecretRef `json:"secretRef,omitempty"`
+
+	// InstanceRef references a LiteLLM instance
+	InstanceRef *InstanceRef `json:"instanceRef,omitempty"`
+}
+
+// SecretRef references a secret containing connection details
+type SecretRef struct {
+	// Name is the name of the secret
+	Name string `json:"name"`
+
+	// Keys defines the keys in the secret that contain connection details
+	Keys SecretKeys `json:"keys"`
+}
+
+// SecretKeys defines the keys in a secret for connection details
+type SecretKeys struct {
+	// MasterKey is the key in the secret containing the master key
+	MasterKey string `json:"masterKey"`
+
+	// URL is the key in the secret containing the LiteLLM URL
+	URL string `json:"url"`
+}
+
+// InstanceRef references a LiteLLM instance
+type InstanceRef struct {
+	// Name is the name of the LiteLLM instance
+	Name string `json:"name"`
+
+	// Namespace is the namespace of the LiteLLM instance (defaults to the same namespace as the Team)
+	Namespace string `json:"namespace,omitempty"`
+}
+
 // TeamSpec defines the desired state of Team
 type TeamSpec struct {
 	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
+
+	// ConnectionRef defines how to connect to the LiteLLM instance
+	// +kubebuilder:validation:Required
+	ConnectionRef ConnectionRef `json:"connectionRef"`
 
 	// Blocked is a flag indicating if the team is blocked or not - will stop all calls from keys with this team_id
 	Blocked bool `json:"blocked,omitempty"`
@@ -119,6 +159,18 @@ type TeamStatus struct {
 
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
+// +kubebuilder:printcolumn:name="Team ID",type="string",JSONPath=".spec.teamID",description="The unique team identifier"
+// +kubebuilder:printcolumn:name="Team Alias",type="string",JSONPath=".spec.teamAlias",description="The team alias"
+// +kubebuilder:printcolumn:name="Organization",type="string",JSONPath=".spec.organizationID",description="The organisation ID"
+// +kubebuilder:printcolumn:name="Blocked",type="boolean",JSONPath=".spec.blocked",description="Whether the team is blocked"
+// +kubebuilder:printcolumn:name="Max Budget",type="string",JSONPath=".spec.maxBudget",description="Maximum budget for the team"
+// +kubebuilder:printcolumn:name="RPM Limit",type="integer",JSONPath=".spec.rpmLimit",description="Requests per minute limit"
+// +kubebuilder:printcolumn:name="TPM Limit",type="integer",JSONPath=".spec.tpmLimit",description="Tokens per minute limit"
+// +kubebuilder:printcolumn:name="Models",type="string",JSONPath=".spec.models",description="Allowed models for the team"
+// +kubebuilder:printcolumn:name="Members",type="integer",JSONPath=".status.membersWithRole",description="Number of team members"
+// +kubebuilder:printcolumn:name="Spend",type="string",JSONPath=".status.spend",description="Current team spend"
+// +kubebuilder:printcolumn:name="Created",type="string",JSONPath=".status.createdAt",description="Team creation date"
+// +kubebuilder:printcolumn:name="Age",type="date",JSONPath=".metadata.creationTimestamp",description="Age of the team"
 
 // Team is the Schema for the teams API
 type Team struct {
