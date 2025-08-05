@@ -5,8 +5,8 @@
 * @bbdsoftware/litellm-operator-maintainers
 
 # API definitions and CRDs
-/api/ @bbdsoftware/litellm-operator-maintainers @api-reviewers
-/config/crd/ @bbdsoftware/litellm-operator-maintainers @api-reviewers
+/api/ @bbdsoftware/litellm-operator-maintainers
+/config/crd/ @bbdsoftware/litellm-operator-maintainers
 
 # Controllers
 /internal/controller/ @bbdsoftware/litellm-operator-maintainers 
