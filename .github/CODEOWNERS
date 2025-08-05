@@ -5,16 +5,14 @@
 * @bbdsoftware/litellm-operator-maintainers
 
 # API definitions and CRDs
-/api/ @litellm-io/maintainers @api-reviewers
 /api/ @bbdsoftware/litellm-operator-maintainers @api-reviewers
-/config/crd/ @litellm-io/maintainers @api-reviewers
 /config/crd/ @bbdsoftware/litellm-operator-maintainers @api-reviewers
 
 # Controllers
 /internal/controller/ @bbdsoftware/litellm-operator-maintainers 
 
 # LiteLLM integration
-/internal/litellm/ @bbdsoftware/litellm-operator-maintainers 
+/internal/litellm/ @bbdsoftware/litellm-operator-maintainers
 
 # Configuration and deployment
 /config/ @bbdsoftware/litellm-operator-maintainers 
@@ -22,11 +20,11 @@
 /Makefile @bbdsoftware/litellm-operator-maintainers
 
 # Documentation
-/README.md @bbdsoftware/litellm-operator-maintainers @docs-team
-*.md @docs-team
+/README.md @bbdsoftware/litellm-operator-maintainers
+*.md @bbdsoftware/litellm-operator-maintainers
 
 # CI/CD and GitHub workflows
-/.github/ @bbdsoftware/litellm-operator-maintainers @platform-team
+/.github/ @bbdsoftware/litellm-operator-maintainers
 
 # Go modules and dependencies
 /go.mod @bbdsoftware/litellm-operator-maintainers
