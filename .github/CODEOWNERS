@@ -2,35 +2,35 @@
 # See https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-code-owners
 
 # Global ownership - replace with actual GitHub usernames/teams
-* @litellm-operator-maintainers
+* @bbdsoftware/litellm-operator-maintainers
 
 # API definitions and CRDs
 /api/ @litellm-io/maintainers @api-reviewers
-/api/ @litellm-operator-maintainers @api-reviewers
+/api/ @bbdsoftware/litellm-operator-maintainers @api-reviewers
 /config/crd/ @litellm-io/maintainers @api-reviewers
-/config/crd/ @litellm-operator-maintainers @api-reviewers
+/config/crd/ @bbdsoftware/litellm-operator-maintainers @api-reviewers
 
 # Controllers
-/internal/controller/ @litellm-operator-maintainers 
+/internal/controller/ @bbdsoftware/litellm-operator-maintainers 
 
 # LiteLLM integration
-/internal/litellm/ @litellm-operator-maintainers 
+/internal/litellm/ @bbdsoftware/litellm-operator-maintainers 
 
 # Configuration and deployment
-/config/ @litellm-operator-maintainers 
-/Dockerfile @litellm-operator-maintainers 
-/Makefile @litellm-operator-maintainers
+/config/ @bbdsoftware/litellm-operator-maintainers 
+/Dockerfile @bbdsoftware/litellm-operator-maintainers 
+/Makefile @bbdsoftware/litellm-operator-maintainers
 
 # Documentation
-/README.md @litellm-operator-maintainers @docs-team
+/README.md @bbdsoftware/litellm-operator-maintainers @docs-team
 *.md @docs-team
 
 # CI/CD and GitHub workflows
-/.github/ @litellm-operator-maintainers @platform-team
+/.github/ @bbdsoftware/litellm-operator-maintainers @platform-team
 
 # Go modules and dependencies
-/go.mod @litellm-operator-maintainers
-/go.sum @litellm-operator-maintainers
+/go.mod @bbdsoftware/litellm-operator-maintainers
+/go.sum @bbdsoftware/litellm-operator-maintainers
 
 # Tests
-/test/ @litellm-operator-maintainers 
+/test/ @bbdsoftware/litellm-operator-maintainers 
