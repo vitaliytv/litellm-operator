@@ -3,17 +3,11 @@ name: CI
 on:
   pull_request:
     branches: [ main ]
-    paths-ignore:
-      - ".github/workflows/*"
-      - "**/*.md"
-      - "docs/**"
-      - "README.md"
-      - "CHANGELOG.md"
-      - "CONTRIBUTING.md"
-      - "SECURITY.md"
-      - "LICENSE"
-  push:
-    branches: [ main ]
+    types:
+      - opened
+      - synchronize
+      - reopened
+      - closed
     paths-ignore:
       - ".github/workflows/*"
       - "**/*.md"

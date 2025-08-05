@@ -210,17 +210,16 @@ jobs:
         echo "Changes made:"
         git diff --stat
 
-    - name: Commit changes
-      run: |
-        git add . 
-        git commit -m "Automated update to $VERSION [skip ci]"
-        git push origin main
-
-      env:
-        GITHUB_TOKEN: ${{ steps.github-app.outputs.token }}
+    - name: Commit and push changes
+      id: commit-and-push
+      uses: EndBug/add-and-commit@v9
+      with:
+        message: "Automated update to $VERSION [skip ci]"
+        push: true
 
     - name: Extract version from Chart.yaml
       id: version
+      if: steps.commit-and-push.outputs.pushed == 'true'
       run: |
         VERSION=$(grep '^version:' deploy/charts/litellm-operator/Chart.yaml | awk '{print $2}')
         echo "version=$VERSION" >> $GITHUB_OUTPUT
@@ -228,6 +227,7 @@ jobs:
 
     - name: Chart | Push
       uses: appany/helm-oci-chart-releaser@v0.5.0
+      if: steps.commit-and-push.outputs.pushed == 'true'
       with:
         name: litellm-operator
         repository: bbdsoftware/charts/
