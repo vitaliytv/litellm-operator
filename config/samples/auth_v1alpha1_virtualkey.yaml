@@ -2,6 +2,7 @@ apiVersion: auth.litellm.ai/v1alpha1
 kind: VirtualKey
 metadata:
   name: example-service
+  namespace: litellm
 spec:
   keyAlias: example-service
   models:
