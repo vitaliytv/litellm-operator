@@ -39,6 +39,7 @@ import (
 	litellmv1alpha1 "github.com/bbdsoftware/litellm-operator/api/litellm/v1alpha1"
 	"github.com/bbdsoftware/litellm-operator/internal/util"
 	"github.com/google/uuid"
+	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 )
 
@@ -53,8 +54,8 @@ const (
 	ConfigPath    = "/etc/litellm/proxy_server_config.yaml" // Path to config file in container
 
 	// Health check paths for container probes
-	LivenessPath  = "/health/liveliness" // Path for liveness probe
-	ReadinessPath = "/health/readiness"  // Path for readiness probe
+	LivenessPath  = "/health/liveness"  // Path for liveness probe
+	ReadinessPath = "/health/readiness" // Path for readiness probe
 )
 
 // Helper functions for descriptive return values
@@ -87,6 +88,9 @@ type LiteLLMInstanceReconciler struct {
 // +kubebuilder:rbac:groups=apps,resources=deployments,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=core,resources=services,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=networking.k8s.io,resources=ingresses,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=core,resources=serviceaccounts,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=rbac.authorization.k8s.io,resources=roles,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=rbac.authorization.k8s.io,resources=rolebindings,verbs=get;list;watch;create;update;patch;delete
 
 // Reconcile moves the current state of the cluster closer to the desired state.
 // It creates or updates all required Kubernetes resources for a LiteLLMInstance:
@@ -126,7 +130,20 @@ func (r *LiteLLMInstanceReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 		return util.HandleConflictError(err)
 	}
 
-	deployment, err := r.createDeployment(ctx, llm, configMap, secret)
+	// Create ServiceAccount for the LiteLLM instance
+	serviceAccount, err := r.createServiceAccount(ctx, llm)
+	if err != nil {
+		log.Error(err, "Failed to create or update ServiceAccount")
+		return util.HandleConflictError(err)
+	}
+
+	// Create Role and RoleBinding for the ServiceAccount
+	if err := r.createRBAC(ctx, llm, serviceAccount); err != nil {
+		log.Error(err, "Failed to create RBAC resources")
+		return util.HandleConflictError(err)
+	}
+
+	deployment, err := r.createDeployment(ctx, llm, configMap, secret, serviceAccount)
 	if err != nil {
 		log.Error(err, "Failed to create or update Deployment")
 		return util.HandleConflictError(err)
@@ -146,9 +163,16 @@ func (r *LiteLLMInstanceReconciler) Reconcile(ctx context.Context, req ctrl.Requ
 	}
 
 	// Update status to reflect successful reconciliation
-	if err := r.updateStatus(ctx, llm, deployment, service); err != nil {
+	allReady, err := r.updateStatus(ctx, llm, deployment, service)
+	if err != nil {
 		log.Error(err, "Failed to update LiteLLMInstance status")
 		return RequeueWithError(err)
+	}
+
+	// Check if all resources are ready, if not, requeue after a short delay
+	if !allReady {
+		log.Info("Resources not ready yet, requeuing", "name", llm.Name)
+		return RequeueAfter(10 * time.Second)
 	}
 
 	log.Info("Successfully reconciled LiteLLMInstance", "name", llm.Name, "namespace", llm.Namespace)
@@ -261,7 +285,8 @@ func buildSecretData(masterKey string, existingSecret *corev1.Secret) map[string
 
 // updateStatus updates the LiteLLM instance status with current information.
 // It updates observed generation, last updated timestamp, resource creation status, and conditions.
-func (r *LiteLLMInstanceReconciler) updateStatus(ctx context.Context, llm *litellmv1alpha1.LiteLLMInstance, deployment *appsv1.Deployment, service *corev1.Service) error {
+// Returns a combined status indicating whether all resources are ready.
+func (r *LiteLLMInstanceReconciler) updateStatus(ctx context.Context, llm *litellmv1alpha1.LiteLLMInstance, deployment *appsv1.Deployment, service *corev1.Service) (bool, error) {
 	// Update observed generation
 	llm.Status.ObservedGeneration = llm.Generation
 
@@ -276,10 +301,51 @@ func (r *LiteLLMInstanceReconciler) updateStatus(ctx context.Context, llm *litel
 	llm.Status.ServiceCreated = service != nil
 	llm.Status.IngressCreated = llm.Spec.Ingress.Enabled
 
-	// Update conditions
-	r.updateConditions(llm, deployment, service)
+	// Fetch the latest deployment status to ensure we have current information
+	var latestDeployment *appsv1.Deployment
+	if deployment != nil {
+		latestDeployment = &appsv1.Deployment{}
+		if err := r.Get(ctx, client.ObjectKey{Name: deployment.Name, Namespace: deployment.Namespace}, latestDeployment); err != nil {
+			// If we can't fetch the latest deployment, use the one we have
+			latestDeployment = deployment
+		}
+	}
 
-	return r.Status().Update(ctx, llm)
+	// Update conditions with the latest deployment status
+	r.updateConditions(llm, latestDeployment, service)
+
+	if err := r.Status().Update(ctx, llm); err != nil {
+		return false, err
+	}
+
+	// Determine if all resources are ready
+	allReady := true
+
+	// Check deployment readiness
+	if latestDeployment != nil {
+		expectedReplicas := int32(1)
+		if latestDeployment.Spec.Replicas != nil {
+			expectedReplicas = *latestDeployment.Spec.Replicas
+		}
+
+		if latestDeployment.Status.ReadyReplicas < expectedReplicas {
+			allReady = false
+		}
+	} else {
+		allReady = false
+	}
+
+	// Check service readiness
+	if service == nil || service.Spec.ClusterIP == "" {
+		allReady = false
+	}
+
+	// Check ingress readiness (if enabled)
+	if llm.Spec.Ingress.Enabled && !llm.Status.IngressCreated {
+		allReady = false
+	}
+
+	return allReady, nil
 }
 
 // updateConditions updates the conditions for the LiteLLM instance.
@@ -330,12 +396,30 @@ func (r *LiteLLMInstanceReconciler) updateConditions(llm *litellmv1alpha1.LiteLL
 	}
 
 	// Check if deployment is actually ready
-	if deployment != nil && deployment.Status.ReadyReplicas > 0 {
-		deploymentReady.Status = metav1.ConditionTrue
-		deploymentReady.Message = fmt.Sprintf("Deployment has %d ready replicas", deployment.Status.ReadyReplicas)
+	if deployment != nil {
+		expectedReplicas := int32(1) // Default to 1 replica as per createDeployment
+		if deployment.Spec.Replicas != nil {
+			expectedReplicas = *deployment.Spec.Replicas
+		}
+
+		if deployment.Status.ReadyReplicas >= expectedReplicas &&
+			deployment.Status.AvailableReplicas >= expectedReplicas &&
+			deployment.Status.UpdatedReplicas >= expectedReplicas {
+			deploymentReady.Status = metav1.ConditionTrue
+			deploymentReady.Reason = "DeploymentReady"
+			deploymentReady.Message = fmt.Sprintf("Deployment has %d/%d ready replicas", deployment.Status.ReadyReplicas, expectedReplicas)
+		} else {
+			deploymentReady.Status = metav1.ConditionFalse
+			deploymentReady.Reason = "DeploymentNotReady"
+			deploymentReady.Message = fmt.Sprintf("Deployment has %d/%d ready replicas, %d/%d available, %d/%d updated",
+				deployment.Status.ReadyReplicas, expectedReplicas,
+				deployment.Status.AvailableReplicas, expectedReplicas,
+				deployment.Status.UpdatedReplicas, expectedReplicas)
+		}
 	} else {
 		deploymentReady.Status = metav1.ConditionFalse
-		deploymentReady.Message = "Deployment is not ready"
+		deploymentReady.Reason = "DeploymentNotReady"
+		deploymentReady.Message = "Deployment object is nil"
 	}
 
 	// Service ready condition
@@ -470,7 +554,7 @@ func (r *LiteLLMInstanceReconciler) createSecret(ctx context.Context, llm *litel
 
 // createDeployment creates or updates the Deployment for the LiteLLM instance.
 // It creates a Deployment that runs the LiteLLM proxy container with appropriate configuration.
-func (r *LiteLLMInstanceReconciler) createDeployment(ctx context.Context, llm *litellmv1alpha1.LiteLLMInstance, configMap *corev1.ConfigMap, secret *corev1.Secret) (*appsv1.Deployment, error) {
+func (r *LiteLLMInstanceReconciler) createDeployment(ctx context.Context, llm *litellmv1alpha1.LiteLLMInstance, configMap *corev1.ConfigMap, secret *corev1.Secret, serviceAccount *corev1.ServiceAccount) (*appsv1.Deployment, error) {
 	deployment := &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      util.GetDeploymentName(llm.Name),
@@ -487,6 +571,7 @@ func (r *LiteLLMInstanceReconciler) createDeployment(ctx context.Context, llm *l
 					Labels: util.GetAppLabels(llm.Name),
 				},
 				Spec: corev1.PodSpec{
+					ServiceAccountName: serviceAccount.Name,
 					Containers: []corev1.Container{
 						buildContainerSpec(llm, secret.Name),
 					},
@@ -544,6 +629,71 @@ func (r *LiteLLMInstanceReconciler) createService(ctx context.Context, llm *lite
 	return service, nil
 }
 
+// createServiceAccount creates or updates the ServiceAccount for the LiteLLM instance.
+// It creates a ServiceAccount that the Deployment will use.
+func (r *LiteLLMInstanceReconciler) createServiceAccount(ctx context.Context, llm *litellmv1alpha1.LiteLLMInstance) (*corev1.ServiceAccount, error) {
+	serviceAccount := &corev1.ServiceAccount{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      util.GetServiceAccountName(llm.Name),
+			Namespace: llm.Namespace,
+			Labels:    util.GetAppLabels(llm.Name),
+		},
+	}
+
+	if err := util.CreateOrUpdateWithRetry(ctx, r.Client, r.Scheme, serviceAccount, llm); err != nil {
+		return nil, err
+	}
+
+	return serviceAccount, nil
+}
+
+// createRBAC creates or updates the Role and RoleBinding for the LiteLLM instance ServiceAccount.
+// It creates a Role with minimal permissions and a RoleBinding to bind it to the ServiceAccount.
+func (r *LiteLLMInstanceReconciler) createRBAC(ctx context.Context, llm *litellmv1alpha1.LiteLLMInstance, serviceAccount *corev1.ServiceAccount) error {
+	// Create Role with minimal permissions for the LiteLLM instance
+	role := &rbacv1.Role{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      util.GetRoleName(llm.Name),
+			Namespace: llm.Namespace,
+			Labels:    util.GetAppLabels(llm.Name),
+		},
+		Rules: []rbacv1.PolicyRule{
+			{
+				APIGroups: []string{""},
+				Resources: []string{"configmaps", "secrets"},
+				Verbs:     []string{"get", "list", "watch"},
+			},
+		},
+	}
+
+	if err := util.CreateOrUpdateWithRetry(ctx, r.Client, r.Scheme, role, llm); err != nil {
+		return err
+	}
+
+	// Create RoleBinding to bind the Role to the ServiceAccount
+	roleBinding := &rbacv1.RoleBinding{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      util.GetRoleBindingName(llm.Name),
+			Namespace: llm.Namespace,
+			Labels:    util.GetAppLabels(llm.Name),
+		},
+		Subjects: []rbacv1.Subject{
+			{
+				Kind:      "ServiceAccount",
+				Name:      serviceAccount.Name,
+				Namespace: serviceAccount.Namespace,
+			},
+		},
+		RoleRef: rbacv1.RoleRef{
+			APIGroup: "rbac.authorization.k8s.io",
+			Kind:     "Role",
+			Name:     role.Name,
+		},
+	}
+
+	return util.CreateOrUpdateWithRetry(ctx, r.Client, r.Scheme, roleBinding, llm)
+}
+
 // createIngress creates or updates the Ingress for the LiteLLM instance.
 // It creates an Ingress resource to expose the LiteLLM proxy externally when enabled.
 func (r *LiteLLMInstanceReconciler) createIngress(ctx context.Context, llm *litellmv1alpha1.LiteLLMInstance) error {
@@ -576,6 +726,8 @@ func (r *LiteLLMInstanceReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Owns(&corev1.Service{}).
 		Owns(&networkingv1.Ingress{}).
 		Owns(&corev1.ServiceAccount{}).
+		Owns(&rbacv1.Role{}).
+		Owns(&rbacv1.RoleBinding{}).
 		Complete(r)
 }
 
@@ -686,8 +838,10 @@ func buildLivenessProbe() *corev1.Probe {
 				Port: util.FromInt(ContainerPort),
 			},
 		},
-		InitialDelaySeconds: 30,
-		PeriodSeconds:       10,
+		InitialDelaySeconds: 60,
+		PeriodSeconds:       30,
+		TimeoutSeconds:      10,
+		FailureThreshold:    3,
 	}
 }
 
@@ -701,8 +855,10 @@ func buildReadinessProbe() *corev1.Probe {
 				Port: util.FromInt(ContainerPort),
 			},
 		},
-		InitialDelaySeconds: 5,
-		PeriodSeconds:       5,
+		InitialDelaySeconds: 10,
+		PeriodSeconds:       10,
+		TimeoutSeconds:      5,
+		FailureThreshold:    3,
 	}
 }
 
@@ -716,7 +872,9 @@ func buildStartupProbe() *corev1.Probe {
 				Port: util.FromInt(ContainerPort),
 			},
 		},
-		InitialDelaySeconds: 10,
-		PeriodSeconds:       5,
+		InitialDelaySeconds: 30,
+		PeriodSeconds:       10,
+		TimeoutSeconds:      5,
+		FailureThreshold:    30,
 	}
 }

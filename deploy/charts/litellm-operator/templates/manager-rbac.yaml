@@ -1,8 +1,9 @@
----
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
-  name: manager-role
+  name: {{ include "litellm-operator.fullname" . }}-manager-role
+  labels:
+  {{- include "litellm-operator.labels" . | nindent 4 }}
 rules:
 - apiGroups:
   - apps
@@ -117,3 +118,18 @@ rules:
   - patch
   - update
   - watch
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: {{ include "litellm-operator.fullname" . }}-manager-rolebinding
+  labels:
+  {{- include "litellm-operator.labels" . | nindent 4 }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: '{{ include "litellm-operator.fullname" . }}-manager-role'
+subjects:
+- kind: ServiceAccount
+  name: '{{ include "litellm-operator.fullname" . }}-controller-manager'
+  namespace: '{{ .Release.Namespace }}'
