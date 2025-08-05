@@ -39,6 +39,7 @@ import (
 	authv1alpha1 "github.com/bbdsoftware/litellm-operator/api/v1alpha1"
 	"github.com/bbdsoftware/litellm-operator/internal/controller"
 	litellmcontroller "github.com/bbdsoftware/litellm-operator/internal/controller/litellm"
+	webhooklitellmv1alpha1 "github.com/bbdsoftware/litellm-operator/internal/webhook/litellm/v1alpha1"
 	// +kubebuilder:scaffold:imports
 )
 
@@ -181,6 +182,13 @@ func main() {
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "LiteLLMInstance")
 		os.Exit(1)
+	}
+	// nolint:goconst
+	if os.Getenv("ENABLE_WEBHOOKS") != "false" {
+		if err := webhooklitellmv1alpha1.SetupLiteLLMInstanceWebhookWithManager(mgr); err != nil {
+			setupLog.Error(err, "unable to create webhook", "webhook", "LiteLLMInstance")
+			os.Exit(1)
+		}
 	}
 	// +kubebuilder:scaffold:builder
 
