@@ -57,12 +57,7 @@ dockers:
       - "--label=org.opencontainers.image.version={{.Version}}"
       - "--label=org.opencontainers.image.source={{.GitURL}}"
       - "--label=org.opencontainers.image.description=Snapshot build from main branch"
-    extra_files:
-      - go.mod
-      - go.sum
-      - api/
-      - internal/
-      - cmd/
+
   - image_templates:
       - "ghcr.io/{{ .Env.GITHUB_REPOSITORY_OWNER }}/{{ .ProjectName }}:main-arm64"
       - "ghcr.io/{{ .Env.GITHUB_REPOSITORY_OWNER }}/{{ .ProjectName }}:main-{{ .ShortCommit }}-arm64"
@@ -79,12 +74,6 @@ dockers:
       - "--label=org.opencontainers.image.version={{.Version}}"
       - "--label=org.opencontainers.image.source={{.GitURL}}"
       - "--label=org.opencontainers.image.description=Snapshot build from main branch"
-    extra_files:
-      - go.mod
-      - go.sum
-      - api/
-      - internal/
-      - cmd/
 
 docker_manifests:
   - name_template: "ghcr.io/{{ .Env.GITHUB_REPOSITORY_OWNER }}/{{ .ProjectName }}:main"
