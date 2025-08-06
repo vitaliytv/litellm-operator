@@ -3,13 +3,25 @@ name: CI
 on:
   pull_request:
     branches: [ main ]
-    types:
-      - opened
-      - synchronize
-      - reopened
-      - closed
     paths-ignore:
       - ".github/workflows/*"
+      - ".goreleaser.yml"
+      - ".goreleaser.prerelease.yml"
+      - ".goreleaser.snapshot.yml"
+      - "**/*.md"
+      - "docs/**"
+      - "README.md"
+      - "CHANGELOG.md"
+      - "CONTRIBUTING.md"
+      - "SECURITY.md"
+      - "LICENSE"
+  push:
+    branches: [ main ]
+    paths-ignore:
+      - ".github/workflows/*"
+      - ".goreleaser.yml"
+      - ".goreleaser.prerelease.yml"
+      - ".goreleaser.snapshot.yml"
       - "**/*.md"
       - "docs/**"
       - "README.md"
