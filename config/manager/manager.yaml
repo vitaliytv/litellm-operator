@@ -5,13 +5,13 @@ metadata:
     control-plane: controller-manager
     app.kubernetes.io/name: litellm-operator
     app.kubernetes.io/managed-by: kustomize
-  name: system
+  name: litellm
 ---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: controller-manager
-  namespace: system
+  namespace: litellm
   labels:
     control-plane: controller-manager
     app.kubernetes.io/name: litellm-operator
