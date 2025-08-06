@@ -2,6 +2,7 @@ apiVersion: auth.litellm.ai/v1alpha1
 kind: User
 metadata:
   name: alice
+  namespace: litellm
 spec:
   userEmail: alice@example.com
   userAlias: alice

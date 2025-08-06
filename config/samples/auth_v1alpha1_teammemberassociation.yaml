@@ -2,11 +2,12 @@ apiVersion: auth.litellm.ai/v1alpha1
 kind: TeamMemberAssociation
 metadata:
   name: alice-ai-team
+  namespace: litellm
 spec:
   connectionRef:
     instanceRef:
       name: litellm-example
       namespace: litellm
-  role: admin
+  role: user
   teamAlias: ai-team
   userEmail: alice@example.com

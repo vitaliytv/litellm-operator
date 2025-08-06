@@ -1,5 +1,5 @@
 name: Release and Publish
-
+run-name: Release and Publish ${{ github.ref_name }}
 on:
   push:
     tags:
@@ -12,6 +12,8 @@ on:
       - "CONTRIBUTING.md"
       - "SECURITY.md"
       - "LICENSE"
+      - "deploy/charts/litellm-operator/**"
+      - "helm/**"
 
 permissions:
   contents: write
@@ -43,29 +45,49 @@ jobs:
   build-and-release:
     needs: run-tests
     runs-on: ubuntu-latest
+    outputs:
+      is_prerelease: ${{ steps.release_type.outputs.is_prerelease }}
+      release_type: ${{ steps.release_type.outputs.release_type }}
+      validated_version: ${{ steps.semver.outputs.version }}
     steps:
     - uses: actions/checkout@v4
       with:
         fetch-depth: 0
-
     - name: Validate semver tag
       id: semver
       uses: matt-usurp/validate-semver@v2
       with:
         version: ${{ github.ref }}
 
-    - name: Display version info
+    - name: Determine release type and configuration
+      id: release_type
       run: |
         echo "✅ Valid semver tag: ${{ steps.semver.outputs.version }}"
         echo "📊 Version breakdown:"
         echo "   Major: ${{ steps.semver.outputs.major }}"
         echo "   Minor: ${{ steps.semver.outputs.minor }}"
         echo "   Patch: ${{ steps.semver.outputs.patch }}"
+        
+        # Determine release type and GoReleaser config
         if [ -n "${{ steps.semver.outputs.prerelease }}" ]; then
-          echo "   Pre-release: ${{ steps.semver.outputs.prerelease }}"
-        fi
-        if [ -n "${{ steps.semver.outputs.build }}" ]; then
-          echo "   Build: ${{ steps.semver.outputs.build }}"
+          PRERELEASE="${{ steps.semver.outputs.prerelease }}"
+          echo "   Pre-release: $PRERELEASE"
+          echo "ℹ️  Pre-release version detected: ${{ steps.semver.outputs.version }}"
+          
+          if [[ "$PRERELEASE" =~ ^(alpha|beta|rc) ]]; then
+            echo "config_file=.goreleaser.prerelease.yml" >> $GITHUB_OUTPUT
+            echo "is_prerelease=true" >> $GITHUB_OUTPUT
+            echo "release_type=prerelease" >> $GITHUB_OUTPUT
+          else
+            echo "config_file=.goreleaser.yml" >> $GITHUB_OUTPUT
+            echo "is_prerelease=true" >> $GITHUB_OUTPUT
+            echo "release_type=other_prerelease" >> $GITHUB_OUTPUT
+          fi
+        else
+          echo "config_file=.goreleaser.yml" >> $GITHUB_OUTPUT
+          echo "is_prerelease=false" >> $GITHUB_OUTPUT
+          echo "release_type=stable" >> $GITHUB_OUTPUT
+          echo "✅ Stable release version: ${{ steps.semver.outputs.version }}"
         fi
         
         # Additional validation for common issues
@@ -73,8 +95,8 @@ jobs:
           echo "⚠️  Warning: Version ${{ steps.semver.outputs.version }} starts with 0.0. This is typically used for initial development."
         fi
         
-        if [ -n "${{ steps.semver.outputs.prerelease }}" ]; then
-          echo "ℹ️  Pre-release version detected: ${{ steps.semver.outputs.version }}"
+        if [ -n "${{ steps.semver.outputs.build }}" ]; then
+          echo "   Build: ${{ steps.semver.outputs.build }}"
         fi
 
     - uses: actions/setup-go@v5
@@ -96,23 +118,10 @@ jobs:
         username: ${{ github.actor }}
         password: ${{ secrets.GITHUB_TOKEN }}
 
-
-
-    - name: Install Cosign
-      uses: sigstore/cosign-installer@v3
-
     - name: Install Helm
       uses: azure/setup-helm@v3
       with:
         version: v3.12.0
-
-    - name: Cache Helm charts
-      uses: actions/cache@v4
-      with:
-        path: ~/.cache/helm
-        key: ${{ runner.os }}-helm-${{ hashFiles('helm/Chart.yaml') }}
-        restore-keys: |
-          ${{ runner.os }}-helm-
 
     - name: Generate CRDs
       run: |
@@ -131,25 +140,46 @@ jobs:
       with:
         distribution: goreleaser
         version: '~> v2'
-        args: release --clean
+        args: release --clean --config ${{ steps.release_type.outputs.config_file }}
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         GITHUB_REPOSITORY_OWNER: ${{ github.repository_owner }}
         DOCKER_BUILDKIT: 1
 
-    
   update-manifests:
     needs: build-and-release
     runs-on: ubuntu-latest
-    if: ${{ !contains(github.ref, 'rc') && !contains(github.ref, 'beta') && !contains(github.ref, 'alpha') }}
     permissions:
       contents: write
-      pull-requests: write
+      packages: write
+      pull-requests: write 
+      checks: write
+      statuses: write
+      id-token: write
     steps:
+    - name: Authenticate GitHub App
+      id: github-app
+      uses: actions/create-github-app-token@v1
+      with:
+        app-id: ${{ secrets.LITELLM_OPERATOR_BOT_APP_ID }}
+        private-key: ${{ secrets.LITELLM_OPERATOR_BOT_PRIVATE_KEY }}
+    
+    - name: Install Helm
+      uses: azure/setup-helm@v4
+      with:
+        version: v3.12.0
+ 
+    - name: Login to GitHub Container Registry
+      uses: docker/login-action@v3
+      with:
+        registry: ghcr.io
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+  
     - uses: actions/checkout@v4
       with:
-        token: ${{ secrets.GITHUB_TOKEN }}
         ref: main
+        token: ${{ steps.github-app.outputs.token }}
 
     - name: Configure Git
       run: |
@@ -158,52 +188,52 @@ jobs:
 
     - name: Update manifests
       run: |
-        # Extract version from tag (remove 'v' prefix)
-        VERSION=${GITHUB_REF#refs/tags/v}
+        # Use validated semver version from previous step
+        VERSION=${{ needs.build-and-release.outputs.validated_version }}
         echo "Updating manifests for version: $VERSION"
         
         # Update the default kustomization to use the new image
         cd config/manager
-        kustomize edit set image controller=ghcr.io/${{ github.repository_owner }}/litellm-operator:${{ github.ref_name }}
+        kustomize edit set image controller=ghcr.io/${{ github.repository_owner }}/litellm-operator:$VERSION
         cd ../..
-        
+
+    - name: run helm generate
+      run: |
+        make helm-gen
         # Update Helm chart version and appVersion
-        sed -i "s/^version: .*/version: $VERSION/" helm/Chart.yaml
-        sed -i "s/^appVersion: .*/appVersion: \"$VERSION\"/" helm/Chart.yaml
-        
-        # Update default image tag in values.yaml
-        sed -i "s/^    tag: .*/    tag: \"$VERSION\"/" helm/values.yaml
-        
+        VERSION=${{ needs.build-and-release.outputs.validated_version }}
+        sed -i "s/^version: .*/version: $VERSION/" deploy/charts/litellm-operator/Chart.yaml
+        sed -i "s/^appVersion: .*/appVersion: $VERSION/" deploy/charts/litellm-operator/Chart.yaml
+
         # Show the changes for debugging
         echo "Changes made:"
         git diff --stat
-      env:
-        GITHUB_REF: ${{ github.ref }}
 
-    - name: Create Pull Request
-      uses: peter-evans/create-pull-request@v5
+    - name: Commit and push changes
+      id: commit-and-push
+      uses: EndBug/add-and-commit@v9
       with:
-        token: ${{ secrets.GITHUB_TOKEN }}
-        branch: update-manifests-${{ github.ref_name }}
-        title: "chore: update operator image and helm chart to ${{ github.ref_name }}"
-        body: |
-          This PR updates the operator manifests and Helm chart to version ${{ github.ref_name }}.
-          
-          Changes made:
-          - Updated operator image tag in kustomization
-          - Updated Helm chart version and appVersion
-          - Updated default image tag in values.yaml
-          
-          This PR was automatically created by the release workflow.
-          
-          **Note:** The Helm Chart Validation workflow will automatically run on this PR to ensure the chart is properly configured before merging.
-        base: main
-        delete-branch: true
-        commit-message: "chore: update operator image and helm chart to ${{ github.ref_name }}"
-        committer: github-actions[bot] <github-actions[bot]@users.noreply.github.com>
-        author: github-actions[bot] <github-actions[bot]@users.noreply.github.com>
-        # labels: |
-        #   automated
-        #   release
-        assignees: ${{ github.actor }}
- 
+        message: "Automated update to $VERSION [skip ci]"
+        default_author: github_actions
+        push: true
+
+    - name: Extract version from Chart.yaml
+      id: version
+      if: steps.commit-and-push.outputs.pushed == 'true'
+      run: |
+        VERSION=$(grep '^version:' deploy/charts/litellm-operator/Chart.yaml | awk '{print $2}')
+        echo "version=$VERSION" >> $GITHUB_OUTPUT
+        echo "Publishing chart version $VERSION to GitHub Packages"
+
+    - name: Chart | Push
+      uses: appany/helm-oci-chart-releaser@v0.5.0
+      if: steps.commit-and-push.outputs.pushed == 'true'
+      with:
+        name: litellm-operator
+        repository: bbdsoftware/charts/
+        tag: ${{ steps.version.outputs.version }}
+        path: deploy/charts/litellm-operator
+        registry: ghcr.io
+        registry_username: ${{ github.actor }}
+        registry_password: ${{ secrets.GITHUB_TOKEN }}
+        update_dependencies: 'false'
