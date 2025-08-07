@@ -1,0 +1,20 @@
+{{- if .Values.webhook.enabled }}
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: {{ include "litellm-operator.fullname" . }}-metrics-certs
+  annotations:
+    "helm.sh/hook": post-install,post-upgrade
+    "helm.sh/hook-weight": "2"
+  labels:
+  {{- include "litellm-operator.labels" . | nindent 4 }}
+spec:
+  dnsNames:
+  - '{{ include "litellm-operator.fullname" . }}-SERVICE_NAME.SERVICE_NAMESPACE.svc'
+  - '{{ include "litellm-operator.fullname" . }}-SERVICE_NAME.SERVICE_NAMESPACE.svc.{{
+    .Values.kubernetesClusterDomain }}'
+  issuerRef:
+    kind: Issuer
+    name: '{{ include "litellm-operator.fullname" . }}-selfsigned-issuer'
+  secretName: metrics-server-cert
+{{- end }}

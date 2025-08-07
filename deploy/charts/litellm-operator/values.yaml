@@ -35,3 +35,5 @@ metricsService:
     protocol: TCP
     targetPort: 8443
   type: ClusterIP
+webhook:
+  enabled: true

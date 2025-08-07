@@ -1,0 +1,12 @@
+# Local development configuration without webhooks
+resources:
+- ../crd
+- ../rbac
+- ../manager
+
+# Exclude webhook and cert-manager resources for local development
+# - ../webhook
+# - ../certmanager
+
+namespace: litellm
+namePrefix: litellm-operator-

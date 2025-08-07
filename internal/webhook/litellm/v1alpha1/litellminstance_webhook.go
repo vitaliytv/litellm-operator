@@ -39,24 +39,12 @@ var litellminstancelog = logf.Log.WithName("litellminstance-resource")
 func SetupLiteLLMInstanceWebhookWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewWebhookManagedBy(mgr).For(&litellmv1alpha1.LiteLLMInstance{}).
 		WithValidator(&LiteLLMInstanceCustomValidator{}).
-		WithDefaulter(&LiteLLMInstanceCustomDefaulter{}).
 		Complete()
 }
 
-// TODO(user): EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
-
-// +kubebuilder:webhook:path=/mutate-litellm-litellm-ai-v1alpha1-litellminstance,mutating=true,failurePolicy=fail,sideEffects=None,groups=litellm.litellm.ai,resources=litellminstances,verbs=create;update,versions=v1alpha1,name=mlitellminstance-v1alpha1.kb.io,admissionReviewVersions=v1
-
-// LiteLLMInstanceCustomDefaulter struct is responsible for setting default values on the custom resource of the
-// Kind LiteLLMInstance when those are created or updated.
-//
-// NOTE: The +kubebuilder:object:generate=false marker prevents controller-gen from generating DeepCopy methods,
-// as it is used only for temporary operations and does not need to be deeply copied.
 type LiteLLMInstanceCustomDefaulter struct {
 	// TODO(user): Add more fields as needed for defaulting
 }
-
-var _ webhook.CustomDefaulter = &LiteLLMInstanceCustomDefaulter{}
 
 // Default implements webhook.CustomDefaulter so a webhook will be registered for the Kind LiteLLMInstance.
 func (d *LiteLLMInstanceCustomDefaulter) Default(_ context.Context, obj runtime.Object) error {
@@ -67,7 +55,23 @@ func (d *LiteLLMInstanceCustomDefaulter) Default(_ context.Context, obj runtime.
 	}
 	litellminstancelog.Info("Defaulting for LiteLLMInstance", "name", litellminstance.GetName())
 
-	// TODO(user): fill in your defaulting logic.
+	// Apply default image if not specified
+	if litellminstance.Spec.Image == "" {
+		litellminstance.Spec.Image = "ghcr.io/berriai/litellm-database:main-v1.74.9.rc.1"
+		litellminstancelog.Info("Applied default image", "image", litellminstance.Spec.Image)
+	}
+
+	// Apply default values for Ingress if not specified
+	if litellminstance.Spec.Ingress.Host == "" {
+		litellminstance.Spec.Ingress.Enabled = false
+		litellminstancelog.Info("Applied default ingress configuration", "enabled", litellminstance.Spec.Ingress.Enabled)
+	}
+
+	// Apply default values for Gateway if not specified
+	if litellminstance.Spec.Gateway.Host == "" {
+		litellminstance.Spec.Gateway.Enabled = false
+		litellminstancelog.Info("Applied default gateway configuration", "enabled", litellminstance.Spec.Gateway.Enabled)
+	}
 
 	return nil
 }

@@ -1,0 +1,12 @@
+# Patch to remove webhook arguments for local development
+- op: remove
+  path: /spec/template/spec/containers/0/args/-
+  value: --webhook-port=9443
+
+- op: remove
+  path: /spec/template/spec/containers/0/args/-
+  value: --webhook-cert-dir=/tmp/certs
+
+- op: remove
+  path: /spec/template/spec/containers/0/args/-
+  value: --webhook-cert-path=/tmp/k8s-webhook-server/serving-certs
