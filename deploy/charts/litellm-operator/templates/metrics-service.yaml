@@ -8,6 +8,7 @@ metadata:
 spec:
   type: {{ .Values.metricsService.type }}
   selector:
+    app.kubernetes.io/name: litellm-operator
     control-plane: controller-manager
     {{- include "litellm-operator.selectorLabels" . | nindent 4 }}
   ports:

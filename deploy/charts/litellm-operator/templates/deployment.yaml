@@ -9,11 +9,13 @@ spec:
   replicas: {{ .Values.controllerManager.replicas }}
   selector:
     matchLabels:
+      app.kubernetes.io/name: litellm-operator
       control-plane: controller-manager
     {{- include "litellm-operator.selectorLabels" . | nindent 6 }}
   template:
     metadata:
       labels:
+        app.kubernetes.io/name: litellm-operator
         control-plane: controller-manager
       {{- include "litellm-operator.selectorLabels" . | nindent 8 }}
       annotations:
@@ -51,19 +53,15 @@ spec:
           }}
         securityContext: {{- toYaml .Values.controllerManager.manager.containerSecurityContext
           | nindent 10 }}
-      {{- if .Values.webhook.enabled }}
         volumeMounts:
         - mountPath: /tmp/k8s-webhook-server/serving-certs
           name: webhook-certs
           readOnly: true
-      {{- end }}
       securityContext: {{- toYaml .Values.controllerManager.podSecurityContext | nindent
         8 }}
       serviceAccountName: {{ include "litellm-operator.fullname" . }}-controller-manager
       terminationGracePeriodSeconds: 10
       volumes:
-      {{- if .Values.webhook.enabled }}
       - name: webhook-certs
         secret:
           secretName: webhook-server-cert
-      {{- end }}

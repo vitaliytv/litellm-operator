@@ -10,9 +10,10 @@ metadata:
   {{- include "litellm-operator.labels" . | nindent 4 }}
 spec:
   dnsNames:
-  - '{{ include "litellm-operator.fullname" . }}-SERVICE_NAME.SERVICE_NAMESPACE.svc'
-  - '{{ include "litellm-operator.fullname" . }}-SERVICE_NAME.SERVICE_NAMESPACE.svc.{{
-    .Values.kubernetesClusterDomain }}'
+  - '{{ include "litellm-operator.fullname" . }}-SERVICE_NAME.{{ .Release.Namespace
+    }}.svc'
+  - '{{ include "litellm-operator.fullname" . }}-SERVICE_NAME.{{ .Release.Namespace
+    }}.svc.{{ .Values.kubernetesClusterDomain }}'
   issuerRef:
     kind: Issuer
     name: '{{ include "litellm-operator.fullname" . }}-selfsigned-issuer'

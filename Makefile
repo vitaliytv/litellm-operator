@@ -371,8 +371,18 @@ helm-package: ## Package the Helm chart.
 
 .PHONY: helm-install
 helm-install: ## Install the Helm chart locally.
-	helm dependency update ./deploy/charts/litellm-operator
-	helm install -n litellm-operator-system --create-namespace litellm-operator ./deploy/charts/litellm-operator
+	helm repo add jetstack https://charts.jetstack.io
+	helm repo update
+	helm install cert-manager jetstack/cert-manager \
+		--namespace cert-manager \
+		--create-namespace \
+		--set crds.enabled=true \
+		--wait \
+		--timeout=5m
+	helm install litellm-operator ./deploy/charts/litellm-operator \
+		--namespace litellm-operator-system \
+		--create-namespace \
+		--set certmanager.enabled=false
 
 .PHONY: helm-uninstall
 helm-uninstall: ## Uninstall the Helm chart locally.
