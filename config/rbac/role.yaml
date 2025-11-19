@@ -7,7 +7,10 @@ rules:
 - apiGroups:
   - ""
   resources:
+  - configmaps
   - secrets
+  - serviceaccounts
+  - services
   verbs:
   - create
   - delete
@@ -63,21 +66,6 @@ rules:
   - get
   - patch
   - update
-- apiGroups:
-  - ""
-  resources:
-  - configmaps
-  - secrets
-  - serviceaccounts
-  - services
-  verbs:
-  - create
-  - delete
-  - get
-  - list
-  - patch
-  - update
-  - watch
 - apiGroups:
   - litellm.litellm.ai
   resources:
