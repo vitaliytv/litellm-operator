@@ -245,7 +245,7 @@ jobs:
           echo "✅ Documentation built successfully"
           
       - name: Upload build artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: mkdocs-site
           path: site/      
