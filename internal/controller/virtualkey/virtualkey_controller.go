@@ -65,6 +65,7 @@ func NewVirtualKeyReconciler(client client.Client, scheme *runtime.Scheme) *Virt
 type ExternalData struct {
 	Key      string `json:"key"`
 	KeyAlias string `json:"keyAlias"`
+	KeyID    string `json:"keyID"`
 }
 
 // +kubebuilder:rbac:groups=auth.litellm.ai,resources=virtualkeys,verbs=get;list;watch;create;update;patch;delete
@@ -235,6 +236,7 @@ func (r *VirtualKeyReconciler) ensureExternal(ctx context.Context, virtualKey *a
 
 		externalData.Key = createResponse.Key
 		externalData.KeyAlias = createResponse.KeyAlias
+		externalData.KeyID = createResponse.Token
 
 		secretName := r.litellmResourceNaming.GenerateSecretName(createResponse.KeyAlias)
 		r.updateVirtualKeyStatus(virtualKey, createResponse, secretName)
@@ -257,16 +259,22 @@ func (r *VirtualKeyReconciler) ensureExternal(ctx context.Context, virtualKey *a
 	updateNeeded := r.LitellmClient.IsVirtualKeyUpdateNeeded(ctx, &observedVirtualKeyDetails, &desiredVirtualKey)
 	if updateNeeded {
 		log.Info("Repairing drift in LiteLLM", "keyAlias", virtualKey.Spec.KeyAlias)
-		// When updating a key, we need to pass the key in the request
-		desiredVirtualKey.Key = observedVirtualKeyDetails.Key
+		// When updating a key, we need to pass the KeyID in the request (which is the same as the Token)
+		desiredVirtualKey.Key = observedVirtualKeyDetails.Token
 		updateResponse, err := r.LitellmClient.UpdateVirtualKey(ctx, &desiredVirtualKey)
 		if err != nil {
 			log.Error(err, "Failed to update virtual key in LiteLLM")
 			return r.HandleErrorRetryable(ctx, virtualKey, err, base.ReasonLitellmError)
 		}
 
-		externalData.Key = updateResponse.Key
 		externalData.KeyAlias = updateResponse.KeyAlias
+		externalData.KeyID = updateResponse.Token
+
+		// If the key is the same as the token, then it's clearly not the key
+		if updateResponse.Key != updateResponse.Token {
+			externalData.Key = updateResponse.Key
+		}
+
 		r.updateVirtualKeyStatus(virtualKey, updateResponse, virtualKey.Status.KeySecretRef)
 		if err := r.PatchStatus(ctx, virtualKey); err != nil {
 			log.Error(err, "Failed to update status after update")
@@ -381,7 +389,7 @@ func (r *VirtualKeyReconciler) updateVirtualKeyStatus(virtualKey *authv1alpha1.V
 	virtualKey.Status.Expires = virtualKeyResponse.Expires
 	virtualKey.Status.Guardrails = virtualKeyResponse.Guardrails
 	virtualKey.Status.KeyAlias = virtualKeyResponse.KeyAlias
-	virtualKey.Status.KeyID = virtualKeyResponse.TokenID
+	virtualKey.Status.KeyID = virtualKeyResponse.Token
 	virtualKey.Status.KeyName = virtualKeyResponse.KeyName
 	virtualKey.Status.KeySecretRef = secretKeyName
 	virtualKey.Status.LiteLLMBudgetTable = virtualKeyResponse.LiteLLMBudgetTable
