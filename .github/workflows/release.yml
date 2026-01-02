@@ -2,8 +2,8 @@ name: Release and Publish
 run-name: Release and Publish ${{ github.ref_name }}
 on:
   push:
-    # tags:
-    #   - "v*"
+    tags:
+      - "v*"
     paths-ignore:
       - "**/*.md"
       - "docs/**"
