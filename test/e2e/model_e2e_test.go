@@ -65,42 +65,27 @@ func init() {
 
 var _ = Describe("Model E2E Tests", Ordered, func() {
 	BeforeAll(func() {
-		cfg := config.GetConfigOrDie()
-		var err error
-		k8sClient, err = client.New(cfg, client.Options{Scheme: scheme.Scheme})
-		Expect(err).NotTo(HaveOccurred())
+		// Initialize k8sClient if not already initialized
+		if k8sClient == nil {
+			cfg := config.GetConfigOrDie()
+			var err error
+			k8sClient, err = client.New(cfg, client.Options{Scheme: scheme.Scheme})
+			Expect(err).NotTo(HaveOccurred())
+		}
 
-		By("creating test namespace")
-		cmd := exec.Command("kubectl", "create", "namespace", modelTestNamespace)
-		_, _ = utils.Run(cmd)
-
-		By("Starting Postgress instance")
-		createPostgresInstance()
-
-		//create postrges-secret in modelTestNamespace
-		By("Creating Postgres Secret")
-		createPostgresSecret()
-
-		By("creating model secret")
-		path := mustSamplePath("test-model-secret.yaml")
-		cmd = exec.Command("kubectl", "apply", "-f", path)
-		_, err = utils.Run(cmd)
-		Expect(err).NotTo(HaveOccurred())
-
-		By("creating LiteLLM instance")
-		createLiteLLMInstance()
-
-		By("waiting for LiteLLM instance to be ready")
+		// Verify LiteLLM instance is ready (it should already be set up in BeforeSuite)
+		By("verifying LiteLLM instance is ready")
 		Eventually(func() error {
 			return waitForLiteLLMInstanceReady()
-		}, testTimeout, testInterval).Should(Succeed())
-
+		}, 30*time.Second, 2*time.Second).Should(Succeed(), "LiteLLM instance must be ready before tests")
 	})
 
-	AfterAll(func() {
-		By("cleaning up test namespace")
-		cmd := exec.Command("kubectl", "delete", "namespace", modelTestNamespace)
-		_, _ = utils.Run(cmd)
+	// BeforeEach ensures the LiteLLM instance is still ready before each test
+	BeforeEach(func() {
+		By("verifying LiteLLM instance is still ready before test execution")
+		Eventually(func() error {
+			return waitForLiteLLMInstanceReady()
+		}, 30*time.Second, 2*time.Second).Should(Succeed(), "LiteLLM instance must be ready before each test")
 	})
 
 	Context("Model Lifecycle", func() {
@@ -274,9 +259,15 @@ func createPostgresSecret() {
 }
 
 func createPostgresInstance() {
-	//install Postges
+	//install Postges operator
 	cmd := exec.Command("kubectl", "apply", "-f", "https://raw.githubusercontent.com/cloudnative-pg/cloudnative-pg/release-1.21/releases/cnpg-1.21.0.yaml")
 	_, err := utils.Run(cmd)
+	if err != nil {
+		Expect(err).NotTo(HaveOccurred())
+	}
+	// Wait for the Postgres operator to be ready
+	cmd = exec.Command("kubectl", "wait", "--for=condition=Ready", "pod", "-l", "app.kubernetes.io/name=cloudnative-pg", "-n", "cnpg-system", "--timeout=300s")
+	_, err = utils.Run(cmd)
 	if err != nil {
 		Expect(err).NotTo(HaveOccurred())
 	}
@@ -288,34 +279,20 @@ func createPostgresInstance() {
 		Expect(err).NotTo(HaveOccurred())
 	}
 
-	podName, err := waitForPodWithPrefix("litellm-postgres-1", 5*time.Minute)
-	Expect(err).NotTo(HaveOccurred())
+	// Wait for the postgres init job to complete
+	EventuallyWithOffset(1, func() error {
+		return waitForPostgresInitComplete()
+	}, testTimeout, testInterval).Should(Succeed())
 
-	// Wait for the cluster to be ready:
+	// Wait for the cluster to be ready
 	cmd = exec.Command("kubectl", "wait", "--for=condition=Ready", "cluster/litellm-postgres", "-n", modelTestNamespace, "--timeout=300s")
 	_, err = utils.Run(cmd)
 	Expect(err).NotTo(HaveOccurred())
 
-	// Wait for all pods to be ready
-	cmd = exec.Command("kubectl", "wait", "--for=condition=Ready", "pod/"+podName, "-n", modelTestNamespace, "--timeout=300s")
-	_, err = utils.Run(cmd)
-	Expect(err).NotTo(HaveOccurred())
-}
-
-func waitForPodWithPrefix(prefix string, timeout time.Duration) (string, error) {
-	deadline := time.Now().Add(timeout)
-	for time.Now().Before(deadline) {
-		cmd := exec.Command("kubectl", "get", "pods", "-n", modelTestNamespace, "-o", "jsonpath={.items[*].metadata.name}")
-		out, _ := utils.Run(cmd)
-		names := strings.Fields(string(out))
-		for _, n := range names {
-			if strings.HasPrefix(n, prefix) && !strings.Contains(n, "initdb") {
-				return n, nil
-			}
-		}
-		time.Sleep(5 * time.Second)
-	}
-	return "", fmt.Errorf("no pod with prefix %q found in namespace %s after %s", prefix, modelTestNamespace, timeout)
+	// Wait for pod to be ready
+	EventuallyWithOffset(1, func() error {
+		return waitForPostgresPodReady()
+	}, testTimeout, testInterval).Should(Succeed())
 }
 
 func createLiteLLMInstance() {
@@ -406,20 +383,30 @@ func createInvalidModelCR(name, modelName string) *litellmv1alpha1.Model {
 	}
 }
 
-func waitForLiteLLMInstanceReady() error {
-	cmd := exec.Command("kubectl", "get", "litellminstance", "e2e-test-instance",
-		"-n", modelTestNamespace,
-		"-o", "jsonpath={.status.conditions[?(@.type=='Ready')].status}")
-
-	output, err := utils.Run(cmd)
+func waitForPostgresInitComplete() error {
+	cmd := exec.Command("kubectl", "wait", "--for=condition=Complete", "job/litellm-postgres-1-initdb", "-n", modelTestNamespace, "--timeout=300s")
+	_, err := utils.Run(cmd)
 	if err != nil {
 		return err
 	}
+	return nil
+}
 
-	if string(output) != condStatusTrue {
-		return fmt.Errorf("LiteLLM instance not ready, status: %s", string(output))
+func waitForPostgresPodReady() error {
+	cmd := exec.Command("kubectl", "wait", "--for=condition=Ready", "pod", "-l", "cnpg.io/instanceName=litellm-postgres-1", "-n", modelTestNamespace, "--timeout=300s")
+	_, err := utils.Run(cmd)
+	if err != nil {
+		return err
 	}
+	return nil
+}
 
+func waitForLiteLLMInstanceReady() error {
+	cmd := exec.Command("kubectl", "wait", "--for=condition=Ready", "litellminstance/e2e-test-instance", "-n", modelTestNamespace, "--timeout=300s")
+	_, err := utils.Run(cmd)
+	if err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -529,33 +516,16 @@ func verifyModelCRStatusError(modelCRName, expectedStatus string, errorMsg strin
 }
 
 func verifyModelCRStatus(modelCRName, expectedStatus string) error {
-	cmd := exec.Command("kubectl", "get", "model", modelCRName,
-		"-n", modelTestNamespace,
-		"-o", "jsonpath={.status.conditions[?(@.type=='Ready')].status}")
-
-	output, err := utils.Run(cmd)
+	modelCR := &litellmv1alpha1.Model{}
+	err := k8sClient.Get(context.Background(), types.NamespacedName{
+		Name:      modelCRName,
+		Namespace: modelTestNamespace,
+	}, modelCR)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to get model %s: %w", modelCRName, err)
 	}
 
-	got := strings.TrimSpace(string(output))
-
-	// Map the human-friendly expected statuses used in tests to the actual condition status values.
-	var expectedConditionStatus string
-	switch expectedStatus {
-	case statusReady:
-		expectedConditionStatus = condStatusTrue
-	case statusError:
-		expectedConditionStatus = condStatusFalse
-	default:
-		expectedConditionStatus = expectedStatus
-	}
-
-	if got != expectedConditionStatus {
-		return fmt.Errorf("expected status %s (condition status %s), got %s", expectedStatus, expectedConditionStatus, got)
-	}
-
-	return nil
+	return verifyReady(modelCR.GetConditions(), expectedStatus)
 }
 
 // Helper functions for creating pointers to primitive types

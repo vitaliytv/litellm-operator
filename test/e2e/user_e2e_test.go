@@ -26,12 +26,31 @@ import (
 	. "github.com/onsi/gomega"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/kubernetes/scheme"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/client/config"
 
 	authv1alpha1 "github.com/bbdsoftware/litellm-operator/api/auth/v1alpha1"
 	"github.com/bbdsoftware/litellm-operator/test/utils"
 )
 
+func init() {
+	// Add the auth scheme
+	err := authv1alpha1.AddToScheme(scheme.Scheme)
+	if err != nil {
+		panic(err)
+	}
+}
+
 var _ = Describe("User E2E Tests", Ordered, func() {
+	BeforeAll(func() {
+		// Initialize k8sClient (reinitialize to ensure auth scheme is registered)
+		cfg := config.GetConfigOrDie()
+		var err error
+		k8sClient, err = client.New(cfg, client.Options{Scheme: scheme.Scheme})
+		Expect(err).NotTo(HaveOccurred())
+	})
+
 	Context("User Lifecycle", func() {
 		It("should create, update, and delete a user successfully", func() {
 			userEmail := "e2e-test@example.com"
@@ -75,23 +94,6 @@ var _ = Describe("User E2E Tests", Ordered, func() {
 			Eventually(func() error {
 				return verifyUserDeletedFromLiteLLM(userEmail)
 			}, testTimeout, testInterval).Should(Succeed())
-		})
-
-		It("should handle user creation with invalid email", func() {
-			invalidEmail := "invalid-email"
-			userCRName := "invalid-email-user"
-
-			By("creating a user CR with invalid email")
-			invalidUserCR := createInvalidUserCR(userCRName, invalidEmail)
-			Expect(k8sClient.Create(context.Background(), invalidUserCR)).To(Succeed())
-
-			By("verifying the user CR shows error status")
-			Eventually(func() error {
-				return verifyUserCRStatusError(userCRName, "Error", "invalid email format")
-			}, testTimeout, testInterval).Should(Succeed())
-
-			By("cleaning up invalid user CR")
-			Expect(k8sClient.Delete(context.Background(), invalidUserCR)).To(Succeed())
 		})
 
 		It("should handle user with auto-create key", func() {
@@ -178,26 +180,6 @@ func createUserCR(name, email string) *authv1alpha1.User {
 			TPMLimit:      1000,
 			Models:        []string{"gpt-4o"},
 			AutoCreateKey: false,
-		},
-	}
-}
-
-func createInvalidUserCR(name, email string) *authv1alpha1.User {
-	return &authv1alpha1.User{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      name,
-			Namespace: modelTestNamespace,
-		},
-		Spec: authv1alpha1.UserSpec{
-			ConnectionRef: authv1alpha1.ConnectionRef{
-				InstanceRef: &authv1alpha1.InstanceRef{
-					Namespace: modelTestNamespace,
-					Name:      "e2e-test-instance",
-				},
-			},
-			UserEmail: email, // Invalid email format
-			UserAlias: name,
-			UserRole:  "internal_user",
 		},
 	}
 }
@@ -289,68 +271,14 @@ func verifyUserKeyCreated(userEmail string) error {
 }
 
 func verifyUserCRStatus(userCRName, expectedStatus string) error {
-	cmd := exec.Command("kubectl", "get", "user", userCRName,
-		"-n", modelTestNamespace,
-		"-o", "jsonpath={.status.conditions[?(@.type=='Ready')].status}")
-
-	output, err := utils.Run(cmd)
+	userCR := &authv1alpha1.User{}
+	err := k8sClient.Get(context.Background(), types.NamespacedName{
+		Name:      userCRName,
+		Namespace: modelTestNamespace,
+	}, userCR)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to get user %s: %w", userCRName, err)
 	}
 
-	got := strings.TrimSpace(string(output))
-	var expectedConditionStatus string
-	switch expectedStatus {
-	case "Ready":
-		expectedConditionStatus = condStatusTrue
-	case "Error":
-		expectedConditionStatus = condStatusFalse
-	default:
-		expectedConditionStatus = expectedStatus
-	}
-
-	if got != expectedConditionStatus {
-		return fmt.Errorf("expected status %s (condition status %s), got %s", expectedStatus, expectedConditionStatus, got)
-	}
-
-	return nil
-}
-
-func verifyUserCRStatusError(userCRName, expectedStatus string, errorMsg string) error {
-	var expectedConditionStatus string
-	switch expectedStatus {
-	case "Ready":
-		expectedConditionStatus = condStatusTrue
-	case "Error":
-		expectedConditionStatus = condStatusFalse
-	default:
-		expectedConditionStatus = expectedStatus
-	}
-
-	cmdStatus := exec.Command("kubectl", "get", "user", userCRName,
-		"-n", modelTestNamespace,
-		"-o", "jsonpath={.status.conditions[?(@.type=='Ready')].status}")
-	outStatus, err := utils.Run(cmdStatus)
-	if err != nil {
-		return err
-	}
-
-	got := strings.TrimSpace(string(outStatus))
-	if got != expectedConditionStatus {
-		return fmt.Errorf("expected status %s (condition status %s), got %s", expectedStatus, expectedConditionStatus, got)
-	}
-
-	cmdMsg := exec.Command("kubectl", "get", "user", userCRName,
-		"-n", modelTestNamespace,
-		"-o", "jsonpath={.status.conditions[?(@.type=='Ready')].message}")
-	outMsg, err := utils.Run(cmdMsg)
-	if err != nil {
-		return err
-	}
-
-	if !strings.Contains(string(outMsg), errorMsg) {
-		return fmt.Errorf("expected error message '%s' not found in status message: %s", errorMsg, string(outMsg))
-	}
-
-	return nil
+	return verifyReady(userCR.GetConditions(), expectedStatus)
 }

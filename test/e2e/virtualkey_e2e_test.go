@@ -26,12 +26,31 @@ import (
 	. "github.com/onsi/gomega"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/kubernetes/scheme"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/client/config"
 
 	authv1alpha1 "github.com/bbdsoftware/litellm-operator/api/auth/v1alpha1"
 	"github.com/bbdsoftware/litellm-operator/test/utils"
 )
 
+func init() {
+	// Add the auth scheme
+	err := authv1alpha1.AddToScheme(scheme.Scheme)
+	if err != nil {
+		panic(err)
+	}
+}
+
 var _ = Describe("VirtualKey E2E Tests", Ordered, func() {
+	BeforeAll(func() {
+		// Initialize k8sClient (reinitialize to ensure auth scheme is registered)
+		cfg := config.GetConfigOrDie()
+		var err error
+		k8sClient, err = client.New(cfg, client.Options{Scheme: scheme.Scheme})
+		Expect(err).NotTo(HaveOccurred())
+	})
+
 	Context("VirtualKey Lifecycle", func() {
 		It("should create, update, and delete a virtual key successfully", func() {
 			keyAlias := "e2e-test-key"
@@ -135,6 +154,11 @@ var _ = Describe("VirtualKey E2E Tests", Ordered, func() {
 			By("verifying the virtual key is blocked")
 			Eventually(func() error {
 				return verifyVirtualKeyBlockedStatus(keyAlias, true)
+			}, testTimeout, testInterval).Should(Succeed())
+
+			By("verifying virtual key CR has ready status")
+			Eventually(func() error {
+				return verifyVirtualKeyCRStatus(keyCRName, "Ready")
 			}, testTimeout, testInterval).Should(Succeed())
 
 			By("unblocking the virtual key")
@@ -412,29 +436,14 @@ func verifyVirtualKeyDuration(keyAlias, expectedDuration string) error {
 }
 
 func verifyVirtualKeyCRStatus(keyCRName, expectedStatus string) error {
-	cmd := exec.Command("kubectl", "get", "virtualkey", keyCRName,
-		"-n", modelTestNamespace,
-		"-o", "jsonpath={.status.conditions[?(@.type=='Ready')].status}")
-
-	output, err := utils.Run(cmd)
+	virtualKeyCR := &authv1alpha1.VirtualKey{}
+	err := k8sClient.Get(context.Background(), types.NamespacedName{
+		Name:      keyCRName,
+		Namespace: modelTestNamespace,
+	}, virtualKeyCR)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to get virtual key %s: %w", keyCRName, err)
 	}
 
-	got := strings.TrimSpace(string(output))
-	var expectedConditionStatus string
-	switch expectedStatus {
-	case statusReady:
-		expectedConditionStatus = condStatusTrue
-	case statusError:
-		expectedConditionStatus = condStatusFalse
-	default:
-		expectedConditionStatus = expectedStatus
-	}
-
-	if got != expectedConditionStatus {
-		return fmt.Errorf("expected status %s (condition status %s), got %s", expectedStatus, expectedConditionStatus, got)
-	}
-
-	return nil
+	return verifyReady(virtualKeyCR.GetConditions(), expectedStatus)
 }

@@ -26,12 +26,31 @@ import (
 	. "github.com/onsi/gomega"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/kubernetes/scheme"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/client/config"
 
 	authv1alpha1 "github.com/bbdsoftware/litellm-operator/api/auth/v1alpha1"
 	"github.com/bbdsoftware/litellm-operator/test/utils"
 )
 
+func init() {
+	// Add the auth scheme
+	err := authv1alpha1.AddToScheme(scheme.Scheme)
+	if err != nil {
+		panic(err)
+	}
+}
+
 var _ = Describe("Team E2E Tests", Ordered, func() {
+	BeforeAll(func() {
+		// Initialize k8sClient (reinitialize to ensure auth scheme is registered)
+		cfg := config.GetConfigOrDie()
+		var err error
+		k8sClient, err = client.New(cfg, client.Options{Scheme: scheme.Scheme})
+		Expect(err).NotTo(HaveOccurred())
+	})
+
 	Context("Team Lifecycle", func() {
 		It("should create, update, and delete a team successfully", func() {
 			teamAlias := "e2e-test-team"
@@ -162,6 +181,11 @@ var _ = Describe("Team E2E Tests", Ordered, func() {
 			By("creating a team CR")
 			teamCR := createTeamCR(teamCRName, teamAlias)
 			Expect(k8sClient.Create(context.Background(), teamCR)).To(Succeed())
+
+			By("waiting for team CR to be ready")
+			Eventually(func() error {
+				return verifyTeamCRStatus(teamCRName)
+			}, testTimeout, testInterval).Should(Succeed())
 
 			By("trying to update the immutable teamAlias field")
 			updatedTeamCR := &authv1alpha1.Team{}
@@ -335,30 +359,14 @@ func verifyTeamBudgetDuration(teamAlias, expectedDuration string) error {
 }
 
 func verifyTeamCRStatus(teamCRName string) error {
-	expectedStatus := statusReady
-	cmd := exec.Command("kubectl", "get", "team", teamCRName,
-		"-n", modelTestNamespace,
-		"-o", "jsonpath={.status.conditions[?(@.type=='Ready')].status}")
-
-	output, err := utils.Run(cmd)
+	teamCR := &authv1alpha1.Team{}
+	err := k8sClient.Get(context.Background(), types.NamespacedName{
+		Name:      teamCRName,
+		Namespace: modelTestNamespace,
+	}, teamCR)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to get team %s: %w", teamCRName, err)
 	}
 
-	got := strings.TrimSpace(string(output))
-	var expectedConditionStatus string
-	switch expectedStatus {
-	case statusReady:
-		expectedConditionStatus = condStatusTrue
-	case statusError:
-		expectedConditionStatus = condStatusFalse
-	default:
-		expectedConditionStatus = expectedStatus
-	}
-
-	if got != expectedConditionStatus {
-		return fmt.Errorf("expected status %s (condition status %s), got %s", expectedStatus, expectedConditionStatus, got)
-	}
-
-	return nil
+	return verifyReady(teamCR.GetConditions(), statusReady)
 }
