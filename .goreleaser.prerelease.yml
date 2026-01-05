@@ -120,9 +120,10 @@ changelog:
     exclude:
       - "^docs:"
       - "^test:"
-      - "^chore:"
+      - "^chore(\([[:word:]]+\))?:"
       - "^ci:"
       - "^Automated update to"
+      - "^Merge pull request #"
   groups:
     - title: Features
       regexp: '^.*?feat(\([[:word:]]+\))??!?:.+$'
