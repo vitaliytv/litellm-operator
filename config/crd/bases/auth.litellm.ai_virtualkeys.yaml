@@ -20,19 +20,19 @@ spec:
       name: Ready
       type: string
     - description: The key alias
-      jsonPath: .spec.keyAlias
+      jsonPath: .status.keyAlias
       name: Alias
       type: string
     - description: The associated user/team ID
-      jsonPath: .spec.userID
+      jsonPath: .status.userID
       name: Owner
       type: string
     - description: Whether the key is blocked
-      jsonPath: .spec.blocked
+      jsonPath: .status.blocked
       name: Blocked
       type: boolean
     - description: Maximum budget for the key
-      jsonPath: .spec.maxBudget
+      jsonPath: .status.maxBudget
       name: Budget
       type: string
     - description: Current key spend

@@ -41,7 +41,7 @@ import (
 
 const (
 	modelTestNamespace = "model-e2e-test"
-	testTimeout        = 3 * time.Minute
+	testTimeout        = 1 * time.Minute
 	testInterval       = 5 * time.Second
 )
 

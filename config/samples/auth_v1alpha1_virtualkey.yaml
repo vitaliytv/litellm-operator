@@ -9,6 +9,7 @@ spec:
     - gpt-4o
   maxBudget: "10"
   budgetDuration: 1h
+  duration: 24h
   connectionRef:
     instanceRef:
       name: litellm-example

@@ -17,12 +17,17 @@ limitations under the License.
 package e2e
 
 import (
+	"context"
 	"fmt"
 	"os/exec"
+	"strconv"
 	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes/scheme"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
@@ -131,3 +136,69 @@ var _ = Describe("controller", Ordered, func() {
 	// Additional e2e test files are included automatically via init() functions
 	// in user_e2e_test.go, team_e2e_test.go, virtualkey_e2e_test.go, and integration_e2e_test.go
 })
+
+// ============================================================================
+// Utility Helpers
+// ============================================================================
+
+// eventuallyVerify wraps the common Eventually pattern for verification functions
+func eventuallyVerify(verifyFn func() error) {
+	Eventually(verifyFn, testTimeout, testInterval).Should(Succeed())
+}
+
+// getSecret retrieves a secret by name
+func getSecret(secretName string) (*corev1.Secret, error) {
+	secretCR := &corev1.Secret{}
+	err := k8sClient.Get(context.Background(), types.NamespacedName{
+		Name:      secretName,
+		Namespace: modelTestNamespace,
+	}, secretCR)
+	if err != nil {
+		// Don't wrap NotFound errors so they can be checked with errors.IsNotFound
+		if errors.IsNotFound(err) {
+			return nil, err
+		}
+		return nil, fmt.Errorf("failed to get secret %s: %w", secretName, err)
+	}
+	return secretCR, nil
+}
+
+// verifySecretDeleted verifies that a secret has been deleted from Kubernetes
+func verifySecretDeleted(secretName string) error {
+	_, err := getSecret(secretName)
+
+	if err != nil {
+		if errors.IsNotFound(err) {
+			return nil
+		}
+		return err
+	}
+
+	return fmt.Errorf("secret %s still exists in Kubernetes", secretName)
+}
+
+// compareBudgetStrings compares two budget strings as floats to account for decimal formatting differences
+func compareBudgetStrings(expected, actual string) error {
+	expectedFloat, err := strconv.ParseFloat(expected, 64)
+	if err != nil {
+		return fmt.Errorf("failed to parse expected budget %s as float: %w", expected, err)
+	}
+	actualFloat, err := strconv.ParseFloat(actual, 64)
+	if err != nil {
+		return fmt.Errorf("failed to parse actual budget %s as float: %w", actual, err)
+	}
+	if actualFloat != expectedFloat {
+		return fmt.Errorf("expected budget %f, got %f", expectedFloat, actualFloat)
+	}
+	return nil
+}
+
+// parseDurationAndCalculateExpiry parses a duration string and calculates the expected expiry time
+func parseDurationAndCalculateExpiry(duration string) (time.Time, error) {
+	expectedDurationParsed, err := time.ParseDuration(duration)
+	if err != nil {
+		return time.Time{}, fmt.Errorf("failed to parse expected duration %s: %w", duration, err)
+	}
+	// calculate the expected expiry time (now + expected duration)
+	return time.Now().Add(expectedDurationParsed), nil
+}

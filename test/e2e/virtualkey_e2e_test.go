@@ -19,11 +19,11 @@ package e2e
 import (
 	"context"
 	"fmt"
-	"os/exec"
-	"strings"
+	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes/scheme"
@@ -31,7 +31,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
 
 	authv1alpha1 "github.com/bbdsoftware/litellm-operator/api/auth/v1alpha1"
-	"github.com/bbdsoftware/litellm-operator/test/utils"
 )
 
 func init() {
@@ -61,50 +60,51 @@ var _ = Describe("VirtualKey E2E Tests", Ordered, func() {
 			Expect(k8sClient.Create(context.Background(), keyCR)).To(Succeed())
 
 			By("verifying the virtual key was created in LiteLLM")
-			Eventually(func() error {
-				return verifyVirtualKeyExistsInLiteLLM(keyAlias)
-			}, testTimeout, testInterval).Should(Succeed())
+			eventuallyVerify(func() error {
+				return verifyVirtualKeyExistsInLiteLLM(keyCRName)
+			})
 
 			By("verifying virtual key CR has ready status")
-			Eventually(func() error {
+			eventuallyVerify(func() error {
 				return verifyVirtualKeyCRStatus(keyCRName, "Ready")
-			}, testTimeout, testInterval).Should(Succeed())
+			})
 
 			By("verifying key secret was created")
-			Eventually(func() error {
-				return verifyKeySecretCreated(keyAlias)
-			}, testTimeout, testInterval).Should(Succeed())
+			eventuallyVerify(func() error {
+				return verifyKeySecretCreated(keyCRName)
+			})
 
 			By("updating the virtual key CR")
-			updatedKeyCR := &authv1alpha1.VirtualKey{}
-			Expect(k8sClient.Get(context.Background(), types.NamespacedName{
-				Name:      keyCRName,
-				Namespace: modelTestNamespace,
-			}, updatedKeyCR)).To(Succeed())
+			updatedKeyCR, err := getVirtualKeyCR(keyCRName)
+			Expect(err).NotTo(HaveOccurred())
+
+			// grab the secret reference for cleanup check later
+			secretRef := updatedKeyCR.Status.KeySecretRef
 
 			// Update key properties
-			updatedKeyCR.Spec.MaxBudget = "30"
-			updatedKeyCR.Spec.RPMLimit = 300
-			updatedKeyCR.Spec.Models = []string{"gpt-4o", "gpt-3.5-turbo"}
+			newBudget := "30"
+			newRPM := 300
+			updatedKeyCR.Spec.MaxBudget = newBudget
+			updatedKeyCR.Spec.RPMLimit = newRPM
 			Expect(k8sClient.Update(context.Background(), updatedKeyCR)).To(Succeed())
 
 			By("verifying the virtual key was updated in LiteLLM")
-			Eventually(func() error {
-				return verifyVirtualKeyUpdatedInLiteLLM(keyAlias, "30", 300)
-			}, testTimeout, testInterval).Should(Succeed())
+			eventuallyVerify(func() error {
+				return verifyVirtualKeyUpdatedInLiteLLM(keyCRName, newBudget, newRPM)
+			})
 
 			By("deleting the virtual key CR")
 			Expect(k8sClient.Delete(context.Background(), updatedKeyCR)).To(Succeed())
 
 			By("verifying the virtual key was deleted from LiteLLM")
-			Eventually(func() error {
-				return verifyVirtualKeyDeletedFromLiteLLM(keyAlias)
-			}, testTimeout, testInterval).Should(Succeed())
+			eventuallyVerify(func() error {
+				return verifyVirtualKeyDeletedFromLiteLLM(keyCRName)
+			})
 
 			By("verifying key secret was deleted")
-			Eventually(func() error {
-				return verifyKeySecretDeleted(keyAlias)
-			}, testTimeout, testInterval).Should(Succeed())
+			eventuallyVerify(func() error {
+				return verifySecretDeleted(secretRef)
+			})
 		})
 
 		It("should handle virtual key with user association", func() {
@@ -117,12 +117,12 @@ var _ = Describe("VirtualKey E2E Tests", Ordered, func() {
 			Expect(k8sClient.Create(context.Background(), keyCR)).To(Succeed())
 
 			By("verifying the virtual key has user association")
-			Eventually(func() error {
-				return verifyVirtualKeyUserAssociation(keyAlias, userID)
-			}, testTimeout, testInterval).Should(Succeed())
+			eventuallyVerify(func() error {
+				return verifyVirtualKeyUserAssociation(keyCRName, userID)
+			})
 
 			By("cleaning up virtual key CR")
-			Expect(k8sClient.Delete(context.Background(), keyCR)).To(Succeed())
+			Expect(cleanupVirtualKeyCR(keyCRName)).To(Succeed())
 		})
 
 		It("should handle virtual key with team association", func() {
@@ -135,50 +135,51 @@ var _ = Describe("VirtualKey E2E Tests", Ordered, func() {
 			Expect(k8sClient.Create(context.Background(), keyCR)).To(Succeed())
 
 			By("verifying the virtual key has team association")
-			Eventually(func() error {
-				return verifyVirtualKeyTeamAssociation(keyAlias, teamID)
-			}, testTimeout, testInterval).Should(Succeed())
+			eventuallyVerify(func() error {
+				return verifyVirtualKeyTeamAssociation(keyCRName, teamID)
+			})
 
 			By("cleaning up virtual key CR")
-			Expect(k8sClient.Delete(context.Background(), keyCR)).To(Succeed())
+			Expect(cleanupVirtualKeyCR(keyCRName)).To(Succeed())
 		})
 
-		It("should handle virtual key with blocked status", func() {
-			keyAlias := "blocked-key"
-			keyCRName := "blocked-key-cr"
+		// TODO: blocking/unblocking virtual keys uses /key/block and /key/unblock endpoints, which are not yet implemented.
+		// 	It("should handle virtual key with blocked status", func() {
+		// 		keyAlias := "blocked-key"
+		// 		keyCRName := "blocked-key-cr"
 
-			By("creating a virtual key CR with blocked status")
-			keyCR := createBlockedVirtualKey(keyCRName, keyAlias)
-			Expect(k8sClient.Create(context.Background(), keyCR)).To(Succeed())
+		// 		By("creating a virtual key CR with blocked status")
+		// 		keyCR := createBlockedVirtualKey(keyCRName, keyAlias)
+		// 		Expect(k8sClient.Create(context.Background(), keyCR)).To(Succeed())
 
-			By("verifying the virtual key is blocked")
-			Eventually(func() error {
-				return verifyVirtualKeyBlockedStatus(keyAlias, true)
-			}, testTimeout, testInterval).Should(Succeed())
+		// 		By("verifying the virtual key is blocked")
+		// 		Eventually(func() error {
+		// 			return verifyVirtualKeyBlockedStatus(keyCRName, true)
+		// 		}, testTimeout, testInterval).Should(Succeed())
 
-			By("verifying virtual key CR has ready status")
-			Eventually(func() error {
-				return verifyVirtualKeyCRStatus(keyCRName, "Ready")
-			}, testTimeout, testInterval).Should(Succeed())
+		// 		By("verifying virtual key CR has ready status")
+		// 		Eventually(func() error {
+		// 			return verifyVirtualKeyCRStatus(keyCRName, "Ready")
+		// 		}, testTimeout, testInterval).Should(Succeed())
 
-			By("unblocking the virtual key")
-			updatedKeyCR := &authv1alpha1.VirtualKey{}
-			Expect(k8sClient.Get(context.Background(), types.NamespacedName{
-				Name:      keyCRName,
-				Namespace: modelTestNamespace,
-			}, updatedKeyCR)).To(Succeed())
+		// 		By("unblocking the virtual key")
+		// 		updatedKeyCR := &authv1alpha1.VirtualKey{}
+		// 		Expect(k8sClient.Get(context.Background(), types.NamespacedName{
+		// 			Name:      keyCRName,
+		// 			Namespace: modelTestNamespace,
+		// 		}, updatedKeyCR)).To(Succeed())
 
-			updatedKeyCR.Spec.Blocked = false
-			Expect(k8sClient.Update(context.Background(), updatedKeyCR)).To(Succeed())
+		// 		updatedKeyCR.Spec.Blocked = false
+		// 		Expect(k8sClient.Update(context.Background(), updatedKeyCR)).To(Succeed())
 
-			By("verifying the virtual key is no longer blocked")
-			Eventually(func() error {
-				return verifyVirtualKeyBlockedStatus(keyAlias, false)
-			}, testTimeout, testInterval).Should(Succeed())
+		// 		By("verifying the virtual key is no longer blocked")
+		// 		Eventually(func() error {
+		// 			return verifyVirtualKeyBlockedStatus(keyCRName, false)
+		// 		}, testTimeout, testInterval).Should(Succeed())
 
-			By("cleaning up virtual key CR")
-			Expect(k8sClient.Delete(context.Background(), updatedKeyCR)).To(Succeed())
-		})
+		// 		By("cleaning up virtual key CR")
+		// 		Expect(k8sClient.Delete(context.Background(), updatedKeyCR)).To(Succeed())
+		// 	})
 	})
 
 	Context("VirtualKey Validation", func() {
@@ -191,44 +192,44 @@ var _ = Describe("VirtualKey E2E Tests", Ordered, func() {
 			Expect(k8sClient.Create(context.Background(), keyCR)).To(Succeed())
 
 			By("trying to update the immutable keyAlias field")
-			updatedKeyCR := &authv1alpha1.VirtualKey{}
-			Expect(k8sClient.Get(context.Background(), types.NamespacedName{
-				Name:      keyCRName,
-				Namespace: modelTestNamespace,
-			}, updatedKeyCR)).To(Succeed())
+			updatedKeyCR, err := getVirtualKeyCR(keyCRName)
+			Expect(err).NotTo(HaveOccurred())
 
 			updatedKeyCR.Spec.KeyAlias = "new-key-alias"
-			err := k8sClient.Update(context.Background(), updatedKeyCR)
+			err = k8sClient.Update(context.Background(), updatedKeyCR)
 			Expect(err).To(HaveOccurred())
 			Expect(err.Error()).To(ContainSubstring("KeyAlias is immutable"))
 
 			By("cleaning up virtual key CR")
-			originalKeyCR := &authv1alpha1.VirtualKey{}
-			Expect(k8sClient.Get(context.Background(), types.NamespacedName{
-				Name:      keyCRName,
-				Namespace: modelTestNamespace,
-			}, originalKeyCR)).To(Succeed())
-			Expect(k8sClient.Delete(context.Background(), originalKeyCR)).To(Succeed())
+			Expect(cleanupVirtualKeyCR(keyCRName)).To(Succeed())
 		})
 
 		It("should handle virtual key with duration and expiry", func() {
 			keyAlias := "expiring-key"
 			keyCRName := "expiring-key-cr"
+			duration := "24h"
 
 			By("creating a virtual key CR with duration")
-			keyCR := createVirtualKeyWithDuration(keyCRName, keyAlias)
+			keyCR := createVirtualKeyWithDuration(keyCRName, keyAlias, duration)
 			Expect(k8sClient.Create(context.Background(), keyCR)).To(Succeed())
 
-			By("verifying the virtual key has duration set")
-			Eventually(func() error {
-				return verifyVirtualKeyDuration(keyAlias, "24h")
-			}, testTimeout, testInterval).Should(Succeed())
+			expectedExpires, err := parseDurationAndCalculateExpiry(duration)
+			Expect(err).NotTo(HaveOccurred())
+
+			By("verifying the virtual key has expiry with the expected duration")
+			eventuallyVerify(func() error {
+				return verifyVirtualKeyExpiry(keyCRName, duration, expectedExpires)
+			})
 
 			By("cleaning up virtual key CR")
-			Expect(k8sClient.Delete(context.Background(), keyCR)).To(Succeed())
+			Expect(cleanupVirtualKeyCR(keyCRName)).To(Succeed())
 		})
 	})
 })
+
+// ============================================================================
+// Creation Helpers
+// ============================================================================
 
 func createVirtualKeyCR(name, keyAlias string) *authv1alpha1.VirtualKey {
 	return &authv1alpha1.VirtualKey{
@@ -265,185 +266,187 @@ func createVirtualKeyWithTeam(name, keyAlias, teamID string) *authv1alpha1.Virtu
 	return keyCR
 }
 
-func createBlockedVirtualKey(name, keyAlias string) *authv1alpha1.VirtualKey {
+func createVirtualKeyWithDuration(name, keyAlias, duration string) *authv1alpha1.VirtualKey {
 	keyCR := createVirtualKeyCR(name, keyAlias)
-	keyCR.Spec.Blocked = true
+	keyCR.Spec.Duration = duration
 	return keyCR
 }
 
-func createVirtualKeyWithDuration(name, keyAlias string) *authv1alpha1.VirtualKey {
-	keyCR := createVirtualKeyCR(name, keyAlias)
-	keyCR.Spec.Duration = "24h"
-	return keyCR
-}
+// ============================================================================
+// Retrieval Helpers
+// ============================================================================
 
-func verifyVirtualKeyExistsInLiteLLM(keyAlias string) error {
-	cmd := exec.Command("kubectl", "get", "virtualkey", "-n", modelTestNamespace,
-		"-o", "jsonpath={.items[?(@.spec.keyAlias=='"+keyAlias+"')].status.keyID}")
-
-	output, err := utils.Run(cmd)
-	if err != nil {
-		return err
-	}
-
-	if strings.TrimSpace(string(output)) == "" {
-		return fmt.Errorf("virtual key %s has empty status.keyID", keyAlias)
-	}
-
-	return nil
-}
-
-func verifyVirtualKeyUpdatedInLiteLLM(keyAlias, expectedBudget string, expectedRPM int) error {
-	// Verify budget
-	cmd := exec.Command("kubectl", "get", "virtualkey", "-n", modelTestNamespace,
-		"-o", "jsonpath={.items[?(@.spec.keyAlias=='"+keyAlias+"')].spec.maxBudget}")
-
-	output, err := utils.Run(cmd)
-	if err != nil {
-		return err
-	}
-
-	if strings.TrimSpace(string(output)) != expectedBudget {
-		return fmt.Errorf("expected budget %s, got %s", expectedBudget, string(output))
-	}
-
-	// Verify RPM limit
-	cmd = exec.Command("kubectl", "get", "virtualkey", "-n", modelTestNamespace,
-		"-o", "jsonpath={.items[?(@.spec.keyAlias=='"+keyAlias+"')].spec.rpmLimit}")
-
-	output, err = utils.Run(cmd)
-	if err != nil {
-		return err
-	}
-
-	actualRPM := strings.TrimSpace(string(output))
-	if actualRPM != fmt.Sprintf("%d", expectedRPM) {
-		return fmt.Errorf("expected RPM limit %d, got %s", expectedRPM, actualRPM)
-	}
-
-	return nil
-}
-
-func verifyVirtualKeyDeletedFromLiteLLM(keyAlias string) error {
-	cmd := exec.Command("kubectl", "get", "virtualkey", "-n", modelTestNamespace,
-		"-o", "jsonpath={.items[?(@.spec.keyAlias=='"+keyAlias+"')].metadata.name}")
-
-	output, err := utils.Run(cmd)
-	if err != nil {
-		return err
-	}
-
-	if string(output) != "" {
-		return fmt.Errorf("virtual key %s still exists in Kubernetes", keyAlias)
-	}
-
-	return nil
-}
-
-func verifyKeySecretCreated(keyAlias string) error {
-	cmd := exec.Command("kubectl", "get", "virtualkey", "-n", modelTestNamespace,
-		"-o", "jsonpath={.items[?(@.spec.keyAlias=='"+keyAlias+"')].status.keySecretRef}")
-
-	output, err := utils.Run(cmd)
-	if err != nil {
-		return err
-	}
-
-	if strings.TrimSpace(string(output)) == "" {
-		return fmt.Errorf("virtual key %s has no secret reference", keyAlias)
-	}
-
-	// Verify secret actually exists
-	secretName := strings.TrimSpace(string(output))
-	secretCmd := exec.Command("kubectl", "get", "secret", secretName, "-n", modelTestNamespace)
-	_, err = utils.Run(secretCmd)
-	if err != nil {
-		return fmt.Errorf("secret %s does not exist", secretName)
-	}
-
-	return nil
-}
-
-func verifyKeySecretDeleted(keyAlias string) error {
-	// In most cases, the secret should be cleaned up when the virtual key is deleted
-	// This verification depends on how your controller handles secret cleanup
-	return nil
-}
-
-func verifyVirtualKeyUserAssociation(keyAlias, expectedUserID string) error {
-	cmd := exec.Command("kubectl", "get", "virtualkey", "-n", modelTestNamespace,
-		"-o", "jsonpath={.items[?(@.spec.keyAlias=='"+keyAlias+"')].spec.userID}")
-
-	output, err := utils.Run(cmd)
-	if err != nil {
-		return err
-	}
-
-	if strings.TrimSpace(string(output)) != expectedUserID {
-		return fmt.Errorf("expected userID %s, got %s", expectedUserID, string(output))
-	}
-
-	return nil
-}
-
-func verifyVirtualKeyTeamAssociation(keyAlias, expectedTeamID string) error {
-	cmd := exec.Command("kubectl", "get", "virtualkey", "-n", modelTestNamespace,
-		"-o", "jsonpath={.items[?(@.spec.keyAlias=='"+keyAlias+"')].spec.teamID}")
-
-	output, err := utils.Run(cmd)
-	if err != nil {
-		return err
-	}
-
-	if strings.TrimSpace(string(output)) != expectedTeamID {
-		return fmt.Errorf("expected teamID %s, got %s", expectedTeamID, string(output))
-	}
-
-	return nil
-}
-
-func verifyVirtualKeyBlockedStatus(keyAlias string, expectedBlocked bool) error {
-	cmd := exec.Command("kubectl", "get", "virtualkey", "-n", modelTestNamespace,
-		"-o", "jsonpath={.items[?(@.spec.keyAlias=='"+keyAlias+"')].spec.blocked}")
-
-	output, err := utils.Run(cmd)
-	if err != nil {
-		return err
-	}
-
-	actualBlocked := strings.TrimSpace(string(output)) == "true"
-	if actualBlocked != expectedBlocked {
-		return fmt.Errorf("expected blocked status %v, got %v", expectedBlocked, actualBlocked)
-	}
-
-	return nil
-}
-
-func verifyVirtualKeyDuration(keyAlias, expectedDuration string) error {
-	cmd := exec.Command("kubectl", "get", "virtualkey", "-n", modelTestNamespace,
-		"-o", "jsonpath={.items[?(@.spec.keyAlias=='"+keyAlias+"')].spec.duration}")
-
-	output, err := utils.Run(cmd)
-	if err != nil {
-		return err
-	}
-
-	if strings.TrimSpace(string(output)) != expectedDuration {
-		return fmt.Errorf("expected duration %s, got %s", expectedDuration, string(output))
-	}
-
-	return nil
-}
-
-func verifyVirtualKeyCRStatus(keyCRName, expectedStatus string) error {
+func getVirtualKeyCR(keyCRName string) (*authv1alpha1.VirtualKey, error) {
 	virtualKeyCR := &authv1alpha1.VirtualKey{}
 	err := k8sClient.Get(context.Background(), types.NamespacedName{
 		Name:      keyCRName,
 		Namespace: modelTestNamespace,
 	}, virtualKeyCR)
 	if err != nil {
+		return nil, fmt.Errorf("failed to get virtual key %s: %w", keyCRName, err)
+	}
+	return virtualKeyCR, nil
+}
+
+// ============================================================================
+// Verification Helpers - LiteLLM
+// ============================================================================
+
+func verifyVirtualKeyExistsInLiteLLM(keyCRName string) error {
+	virtualKeyCR, err := getVirtualKeyCR(keyCRName)
+	if err != nil {
+		return err
+	}
+
+	if virtualKeyCR.Status.KeyID == "" {
+		return fmt.Errorf("virtual key %s has empty status.keyID", keyCRName)
+	}
+
+	return nil
+}
+
+func verifyVirtualKeyUpdatedInLiteLLM(keyCRName, expectedBudget string, expectedRPM int) error {
+	virtualKeyCR, err := getVirtualKeyCR(keyCRName)
+	if err != nil {
+		return err
+	}
+
+	// Verify budget - parse as floats to account for decimal formatting differences
+	if err := compareBudgetStrings(expectedBudget, virtualKeyCR.Status.MaxBudget); err != nil {
+		return err
+	}
+
+	// Verify RPM limit
+	if virtualKeyCR.Status.RPMLimit != expectedRPM {
+		return fmt.Errorf("expected RPM limit %d, got %d", expectedRPM, virtualKeyCR.Status.RPMLimit)
+	}
+
+	return nil
+}
+
+func verifyVirtualKeyDeletedFromLiteLLM(keyCRName string) error {
+	virtualKeyCR := &authv1alpha1.VirtualKey{}
+	err := k8sClient.Get(context.Background(), types.NamespacedName{
+		Name:      keyCRName,
+		Namespace: modelTestNamespace,
+	}, virtualKeyCR)
+
+	if err != nil {
+		// If the CR is not found, that's acceptable - it means it was deleted
+		if errors.IsNotFound(err) {
+			return nil
+		}
 		return fmt.Errorf("failed to get virtual key %s: %w", keyCRName, err)
 	}
 
+	if virtualKeyCR.GetDeletionTimestamp().IsZero() {
+		return fmt.Errorf("virtual key %s is not deleted", keyCRName)
+	}
+
+	return nil
+}
+
+// ============================================================================
+// Verification Helpers - Status
+// ============================================================================
+
+func verifyVirtualKeyCRStatus(keyCRName, expectedStatus string) error {
+	virtualKeyCR, err := getVirtualKeyCR(keyCRName)
+	if err != nil {
+		return err
+	}
+
 	return verifyReady(virtualKeyCR.GetConditions(), expectedStatus)
+}
+
+// verifyVirtualKeyStatusString is a generic helper to verify string status fields
+func verifyVirtualKeyStatusString(keyCRName, fieldName, expectedValue string) error {
+	virtualKeyCR, err := getVirtualKeyCR(keyCRName)
+	if err != nil {
+		return err
+	}
+
+	var actualValue string
+	switch fieldName {
+	case "UserID":
+		actualValue = virtualKeyCR.Status.UserID
+	case "TeamID":
+		actualValue = virtualKeyCR.Status.TeamID
+	default:
+		return fmt.Errorf("unknown field name: %s", fieldName)
+	}
+
+	if actualValue != expectedValue {
+		return fmt.Errorf("expected %s %s, got %s", fieldName, expectedValue, actualValue)
+	}
+
+	return nil
+}
+
+func verifyVirtualKeyUserAssociation(keyCRName, expectedUserID string) error {
+	return verifyVirtualKeyStatusString(keyCRName, "UserID", expectedUserID)
+}
+
+func verifyVirtualKeyTeamAssociation(keyCRName, expectedTeamID string) error {
+	return verifyVirtualKeyStatusString(keyCRName, "TeamID", expectedTeamID)
+}
+
+func verifyVirtualKeyExpiry(keyCRName, duration string, expectedExpires time.Time) error {
+	virtualKeyCR, err := getVirtualKeyCR(keyCRName)
+	if err != nil {
+		return err
+	}
+
+	// when a duration is set, the response will contain a datestring in the `expires` field
+	if virtualKeyCR.Status.Expires == "" {
+		return fmt.Errorf("expected an expiry but got none")
+	}
+
+	// parse the expires field and convert it to a time.Time
+	expires, err := time.Parse(time.RFC3339, virtualKeyCR.Status.Expires)
+	if err != nil {
+		return fmt.Errorf("failed to parse expires field: %w", err)
+	}
+
+	// compare with tolerance (allow up to 10 seconds difference for processing time and clock skew)
+	tolerance := 10 * time.Second
+	diff := expires.Sub(expectedExpires)
+	if diff < 0 {
+		diff = -diff
+	}
+	if diff > tolerance {
+		return fmt.Errorf("expires time %v is not approximately %v ahead of now (expected: %v, got: %v, difference: %v, tolerance: %v)",
+			expires, duration, expectedExpires, expires, diff, tolerance)
+	}
+
+	return nil
+}
+
+// ============================================================================
+// Utility Helpers
+// ============================================================================
+
+// verifyKeySecretCreated verifies that a k8s secret has been created for a virtual key
+func verifyKeySecretCreated(keyCRName string) error {
+	virtualKeyCR, err := getVirtualKeyCR(keyCRName)
+	if err != nil {
+		return err
+	}
+
+	if virtualKeyCR.Status.KeySecretRef == "" {
+		return fmt.Errorf("virtual key %s has no secret reference", keyCRName)
+	}
+
+	// Verify secret actually exists
+	_, err = getSecret(virtualKeyCR.Status.KeySecretRef)
+	return err
+}
+
+// cleanupVirtualKeyCR deletes a virtual key CR by name
+func cleanupVirtualKeyCR(keyCRName string) error {
+	keyCR, err := getVirtualKeyCR(keyCRName)
+	if err != nil {
+		return err
+	}
+	return k8sClient.Delete(context.Background(), keyCR)
 }

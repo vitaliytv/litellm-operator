@@ -104,6 +104,8 @@ func (l *LitellmClient) GenerateVirtualKey(ctx context.Context, req *VirtualKeyR
 		return VirtualKeyResponse{}, err
 	}
 
+	log.Info("---------------------------", "response", string(response))
+
 	var virtualKeyResponse VirtualKeyResponse
 	if err := json.Unmarshal(response, &virtualKeyResponse); err != nil {
 		log.Error(err, "Failed to unmarshal virtual key response from Litellm")

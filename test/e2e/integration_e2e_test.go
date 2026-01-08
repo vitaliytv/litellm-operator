@@ -110,7 +110,7 @@ var _ = Describe("Integration E2E Tests", Ordered, func() {
 
 			By("verifying all resources are deleted")
 			Eventually(func() error {
-				if err := verifyVirtualKeyDeletedFromLiteLLM(keyAlias); err != nil {
+				if err := verifyVirtualKeyDeletedFromLiteLLM(keyCRName); err != nil {
 					return fmt.Errorf("virtual key still exists: %v", err)
 				}
 				if err := verifyUserDeletedFromLiteLLM(userEmail); err != nil {
