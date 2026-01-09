@@ -178,10 +178,10 @@ type UserStatus struct {
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
 // +kubebuilder:printcolumn:name="Ready",type="string",JSONPath=".status.conditions[?(@.type=='Ready')].status",description="The ready status of the user"
-// +kubebuilder:printcolumn:name="Email",type="string",JSONPath=".spec.userEmail",description="The user's email address"
-// +kubebuilder:printcolumn:name="Role",type="string",JSONPath=".spec.userRole",description="The user's role"
-// +kubebuilder:printcolumn:name="Blocked",type="boolean",JSONPath=".spec.blocked",description="Whether the user is blocked"
-// +kubebuilder:printcolumn:name="Budget",type="string",JSONPath=".spec.maxBudget",description="Maximum budget for the user"
+// +kubebuilder:printcolumn:name="Email",type="string",JSONPath=".status.userEmail",description="The user's email address"
+// +kubebuilder:printcolumn:name="Role",type="string",JSONPath=".status.userRole",description="The user's role"
+// +kubebuilder:printcolumn:name="Blocked",type="boolean",JSONPath=".status.blocked",description="Whether the user is blocked"
+// +kubebuilder:printcolumn:name="Budget",type="string",JSONPath=".status.maxBudget",description="Maximum budget for the user"
 // +kubebuilder:printcolumn:name="Spend",type="string",JSONPath=".status.spend",description="Current user spend"
 // +kubebuilder:printcolumn:name="Age",type="date",JSONPath=".metadata.creationTimestamp",description="Time since creation"
 

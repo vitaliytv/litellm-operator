@@ -122,7 +122,7 @@ var _ = Describe("VirtualKey E2E Tests", Ordered, func() {
 			})
 
 			By("cleaning up virtual key CR")
-			Expect(cleanupVirtualKeyCR(keyCRName)).To(Succeed())
+			Expect(deleteVirtualKeyCR(keyCRName)).To(Succeed())
 		})
 
 		It("should handle virtual key with team association", func() {
@@ -140,7 +140,7 @@ var _ = Describe("VirtualKey E2E Tests", Ordered, func() {
 			})
 
 			By("cleaning up virtual key CR")
-			Expect(cleanupVirtualKeyCR(keyCRName)).To(Succeed())
+			Expect(deleteVirtualKeyCR(keyCRName)).To(Succeed())
 		})
 
 		// TODO: blocking/unblocking virtual keys uses /key/block and /key/unblock endpoints, which are not yet implemented.
@@ -201,7 +201,7 @@ var _ = Describe("VirtualKey E2E Tests", Ordered, func() {
 			Expect(err.Error()).To(ContainSubstring("KeyAlias is immutable"))
 
 			By("cleaning up virtual key CR")
-			Expect(cleanupVirtualKeyCR(keyCRName)).To(Succeed())
+			Expect(deleteVirtualKeyCR(keyCRName)).To(Succeed())
 		})
 
 		It("should handle virtual key with duration and expiry", func() {
@@ -222,7 +222,7 @@ var _ = Describe("VirtualKey E2E Tests", Ordered, func() {
 			})
 
 			By("cleaning up virtual key CR")
-			Expect(cleanupVirtualKeyCR(keyCRName)).To(Succeed())
+			Expect(deleteVirtualKeyCR(keyCRName)).To(Succeed())
 		})
 	})
 })
@@ -311,7 +311,7 @@ func verifyVirtualKeyUpdatedInLiteLLM(keyCRName, expectedBudget string, expected
 		return err
 	}
 
-	// Verify budget - parse as floats to account for decimal formatting differences
+	// Verify budget
 	if err := compareBudgetStrings(expectedBudget, virtualKeyCR.Status.MaxBudget); err != nil {
 		return err
 	}
@@ -340,10 +340,10 @@ func verifyVirtualKeyDeletedFromLiteLLM(keyCRName string) error {
 	}
 
 	if virtualKeyCR.GetDeletionTimestamp().IsZero() {
-		return fmt.Errorf("virtual key %s is not deleted", keyCRName)
+		return fmt.Errorf("virtual key %s is not marked for deletion", keyCRName)
 	}
 
-	return nil
+	return fmt.Errorf("virtual key %s is not deleted", keyCRName)
 }
 
 // ============================================================================
@@ -442,8 +442,8 @@ func verifyKeySecretCreated(keyCRName string) error {
 	return err
 }
 
-// cleanupVirtualKeyCR deletes a virtual key CR by name
-func cleanupVirtualKeyCR(keyCRName string) error {
+// deleteVirtualKeyCR deletes a virtual key CR by name
+func deleteVirtualKeyCR(keyCRName string) error {
 	keyCR, err := getVirtualKeyCR(keyCRName)
 	if err != nil {
 		return err

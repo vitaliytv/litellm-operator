@@ -20,19 +20,19 @@ spec:
       name: Ready
       type: string
     - description: The user's email address
-      jsonPath: .spec.userEmail
+      jsonPath: .status.userEmail
       name: Email
       type: string
     - description: The user's role
-      jsonPath: .spec.userRole
+      jsonPath: .status.userRole
       name: Role
       type: string
     - description: Whether the user is blocked
-      jsonPath: .spec.blocked
+      jsonPath: .status.blocked
       name: Blocked
       type: boolean
     - description: Maximum budget for the user
-      jsonPath: .spec.maxBudget
+      jsonPath: .status.maxBudget
       name: Budget
       type: string
     - description: Current user spend

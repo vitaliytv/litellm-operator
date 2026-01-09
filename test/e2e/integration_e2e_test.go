@@ -113,7 +113,7 @@ var _ = Describe("Integration E2E Tests", Ordered, func() {
 				if err := verifyVirtualKeyDeletedFromLiteLLM(keyCRName); err != nil {
 					return fmt.Errorf("virtual key still exists: %v", err)
 				}
-				if err := verifyUserDeletedFromLiteLLM(userEmail); err != nil {
+				if err := verifyUserDeletedFromLiteLLM(userCRName); err != nil {
 					return fmt.Errorf("user still exists: %v", err)
 				}
 				if err := verifyTeamDeletedFromLiteLLM(teamAlias); err != nil {
@@ -250,7 +250,7 @@ var _ = Describe("Integration E2E Tests", Ordered, func() {
 
 			By("verifying all resources are deleted")
 			Eventually(func() error {
-				if err := verifyUserDeletedFromLiteLLM(userEmail); err != nil {
+				if err := verifyUserDeletedFromLiteLLM(userCRName); err != nil {
 					return fmt.Errorf("user still exists: %v", err)
 				}
 				if err := verifyTeamDeletedFromLiteLLM(teamAlias); err != nil {
