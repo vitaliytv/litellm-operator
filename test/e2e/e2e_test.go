@@ -45,7 +45,7 @@ var _ = BeforeSuite(func() {
 	var err error
 
 	// projectimage stores the name of the image used in the example
-	var projectimage = "example.com/litellm-operator:v0.0.1"
+	var projectimage = "litellm-operator:dev"
 
 	By("building the manager(Operator) image")
 	cmd = exec.Command("make", "docker-build", fmt.Sprintf("IMG=%s", projectimage))
@@ -62,7 +62,7 @@ var _ = BeforeSuite(func() {
 	ExpectWithOffset(1, err).NotTo(HaveOccurred())
 
 	By("deploying the controller-manager")
-	cmd = exec.Command("make", "deploy", fmt.Sprintf("IMG=%s", projectimage))
+	cmd = exec.Command("make", "deploy-controller-dev")
 	_, err = utils.Run(cmd)
 	ExpectWithOffset(1, err).NotTo(HaveOccurred())
 

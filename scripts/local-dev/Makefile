@@ -26,7 +26,7 @@ kind-cluster-delete: ## Delete a Kind cluster.
 .PHONY: deploy-controller-dev
 deploy-controller-dev: manifests kustomize
 	$(KUSTOMIZE) build config/default | $(KUBECTL) apply -f -
-	$(KUBECTL) patch deployment litellm-operator-controller-manager -n litellm-operator-system --type=json -p='[{"op": "replace", "path": "/spec/template/spec/containers/0/imagePullPolicy", "value": "Never"},{"op": "replace", "path": "/spec/template/spec/containers/0/image", "value": "controller:dev"}]'
+	$(KUBECTL) patch deployment litellm-operator-controller-manager -n litellm-operator-system --type=json -p='[{"op": "replace", "path": "/spec/template/spec/containers/0/imagePullPolicy", "value": "Never"},{"op": "replace", "path": "/spec/template/spec/containers/0/image", "value": "litellm-operator:dev"}]'
 
 .PHONY: deploy-manifests-dev
 deploy-manifests-dev: manifests kustomize
@@ -44,7 +44,7 @@ deploy-manifests-dev: manifests kustomize
 dev-cluster-bootstrap-debug: kind-cluster install deploy-manifests-dev install-samples
 
 .PHONY: dev-cluster-bootstrap-full
-dev-cluster-bootstrap-full: IMG=controller:dev
+dev-cluster-bootstrap-full: IMG=litellm-operator:dev
 dev-cluster-bootstrap-full: kind-cluster docker-build docker-load install deploy-controller-dev deploy-manifests-dev install-samples 
 
 .PHONY: dev-cluster-bootstrap-full-recreate
