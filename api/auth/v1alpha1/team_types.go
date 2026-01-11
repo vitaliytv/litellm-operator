@@ -226,11 +226,11 @@ type TeamStatus struct {
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
 // +kubebuilder:printcolumn:name="Ready",type="string",JSONPath=".status.conditions[?(@.type=='Ready')].status",description="The ready status of the team"
-// +kubebuilder:printcolumn:name="Alias",type="string",JSONPath=".spec.teamAlias",description="The team alias"
-// +kubebuilder:printcolumn:name="Organisation",type="string",JSONPath=".spec.organizationID",description="The organisation ID"
-// +kubebuilder:printcolumn:name="Blocked",type="boolean",JSONPath=".spec.blocked",description="Whether the team is blocked"
+// +kubebuilder:printcolumn:name="Alias",type="string",JSONPath=".status.teamAlias",description="The team alias"
+// +kubebuilder:printcolumn:name="Organisation",type="string",JSONPath=".status.organizationID",description="The organisation ID"
+// +kubebuilder:printcolumn:name="Blocked",type="boolean",JSONPath=".status.blocked",description="Whether the team is blocked"
 // +kubebuilder:printcolumn:name="Members",type="integer",JSONPath=".status.membersWithRole[*]",description="Number of team members"
-// +kubebuilder:printcolumn:name="Budget",type="string",JSONPath=".spec.maxBudget",description="Maximum budget for the team"
+// +kubebuilder:printcolumn:name="Budget",type="string",JSONPath=".status.maxBudget",description="Maximum budget for the team"
 // +kubebuilder:printcolumn:name="Spend",type="string",JSONPath=".status.spend",description="Current team spend"
 // +kubebuilder:printcolumn:name="Age",type="date",JSONPath=".metadata.creationTimestamp",description="Time since creation"
 

@@ -65,7 +65,7 @@ var _ = Describe("User E2E Tests", Ordered, func() {
 
 			By("verifying user CR has ready status")
 			eventuallyVerify(func() error {
-				return verifyUserCRStatus(userCRName, "Ready")
+				return verifyUserCRStatus(userCRName, statusReady)
 			})
 
 			By("updating the user CR")

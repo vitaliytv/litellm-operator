@@ -20,15 +20,15 @@ spec:
       name: Ready
       type: string
     - description: The team alias
-      jsonPath: .spec.teamAlias
+      jsonPath: .status.teamAlias
       name: Alias
       type: string
     - description: The organisation ID
-      jsonPath: .spec.organizationID
+      jsonPath: .status.organizationID
       name: Organisation
       type: string
     - description: Whether the team is blocked
-      jsonPath: .spec.blocked
+      jsonPath: .status.blocked
       name: Blocked
       type: boolean
     - description: Number of team members
@@ -36,7 +36,7 @@ spec:
       name: Members
       type: integer
     - description: Maximum budget for the team
-      jsonPath: .spec.maxBudget
+      jsonPath: .status.maxBudget
       name: Budget
       type: string
     - description: Current team spend

@@ -65,7 +65,7 @@ var _ = Describe("Integration E2E Tests", Ordered, func() {
 
 			By("verifying all resources are ready")
 			Eventually(func() error {
-				if err := verifyTeamCRStatus(teamCRName); err != nil {
+				if err := verifyTeamCRStatus(teamCRName, statusReady); err != nil {
 					return fmt.Errorf("team not ready: %v", err)
 				}
 				if err := verifyUserCRStatus(userCRName, statusReady); err != nil {
@@ -116,7 +116,7 @@ var _ = Describe("Integration E2E Tests", Ordered, func() {
 				if err := verifyUserDeletedFromLiteLLM(userCRName); err != nil {
 					return fmt.Errorf("user still exists: %v", err)
 				}
-				if err := verifyTeamDeletedFromLiteLLM(teamAlias); err != nil {
+				if err := verifyTeamDeletedFromLiteLLM(teamCRName); err != nil {
 					return fmt.Errorf("team still exists: %v", err)
 				}
 				return nil
@@ -253,7 +253,7 @@ var _ = Describe("Integration E2E Tests", Ordered, func() {
 				if err := verifyUserDeletedFromLiteLLM(userCRName); err != nil {
 					return fmt.Errorf("user still exists: %v", err)
 				}
-				if err := verifyTeamDeletedFromLiteLLM(teamAlias); err != nil {
+				if err := verifyTeamDeletedFromLiteLLM(teamCRName); err != nil {
 					return fmt.Errorf("team still exists: %v", err)
 				}
 				return nil
