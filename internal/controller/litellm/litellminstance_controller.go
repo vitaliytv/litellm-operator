@@ -1370,8 +1370,6 @@ func buildEnvironmentVariables(llm *litellmv1alpha1.LiteLLMInstance, secretName 
 		}
 		envVars = append(envVars, dbEnvVars...)
 
-		// Add extra environment variables
-		envVars = append(envVars, llm.Spec.ExtraEnvVars...)
 	}
 
 	for _, model := range llm.Spec.Models {
@@ -1409,6 +1407,9 @@ func buildEnvironmentVariables(llm *litellmv1alpha1.LiteLLMInstance, secretName 
 			})
 		}
 	}
+
+	// Add extra environment variables
+	envVars = append(envVars, llm.Spec.ExtraEnvVars...)
 
 	return envVars
 }
