@@ -327,7 +327,7 @@ func (r *TeamReconciler) updateTeamStatus(team *authv1alpha1.Team, teamResponse 
 
 // convertToK8sTeamMemberWithRole converts the Litellm TeamMemberWithRole to TeamMemberWithRole
 func convertToK8sTeamMemberWithRole(membersWithRole []litellm.TeamMemberWithRole) []authv1alpha1.TeamMemberWithRole {
-	k8sMembersWithRole := []authv1alpha1.TeamMemberWithRole{}
+	k8sMembersWithRole := make([]authv1alpha1.TeamMemberWithRole, 0, len(membersWithRole))
 	for _, member := range membersWithRole {
 		k8sMembersWithRole = append(k8sMembersWithRole, authv1alpha1.TeamMemberWithRole{
 			UserID:    member.UserID,
