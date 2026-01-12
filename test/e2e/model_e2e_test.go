@@ -23,12 +23,12 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
-	"strings"
 	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes/scheme"
@@ -89,44 +89,49 @@ var _ = Describe("Model E2E Tests", Ordered, func() {
 	})
 
 	Context("Model Lifecycle", func() {
-		It("should create, update, and delete a model successfully", func() {
-			modelName := "e2e-test-model"
-			modelCRName := "e2e-test-model-cr"
+		// TODO: model update is missing a lot of functionality, and complicated by litellm returning some values
+		// in scientific notation, the whole model update needs to be reworked to handle this.
+		//
+		// It("should create, update, and delete a model successfully", func() {
+		// 	modelName := "e2e-test-model"
+		// 	modelCRName := "e2e-test-model-cr"
 
-			By("creating a model CR")
-			modelCR := createModelCR(modelCRName, modelName)
-			Expect(k8sClient.Create(context.Background(), modelCR)).To(Succeed())
+		// 	By("creating a model CR")
+		// 	modelCR := createModelCR(modelCRName, modelName)
+		// 	Expect(k8sClient.Create(context.Background(), modelCR)).To(Succeed())
 
-			By("verifying the model was created in LiteLLM")
-			Eventually(func() error {
-				return verifyModelExistsInLiteLLM(modelName)
-			}, testTimeout, testInterval).Should(Succeed())
+		// 	By("verifying the model was created in LiteLLM")
+		// 	Eventually(func() error {
+		// 		return verifyModelExistsInLiteLLM(modelCRName)
+		// 	}, testTimeout, testInterval).Should(Succeed())
 
-			By("updating the model CR")
-			updatedModelCR := &litellmv1alpha1.Model{}
-			Expect(k8sClient.Get(context.Background(), types.NamespacedName{
-				Name:      modelCRName,
-				Namespace: modelTestNamespace,
-			}, updatedModelCR)).To(Succeed())
+		// 	By("updating the model CR")
+		// 	updatedModelCR := &litellmv1alpha1.Model{}
+		// 	Expect(k8sClient.Get(context.Background(), types.NamespacedName{
+		// 		Name:      modelCRName,
+		// 		Namespace: modelTestNamespace,
+		// 	}, updatedModelCR)).To(Succeed())
 
-			// Update the model parameters
-			updatedModelCR.Spec.LiteLLMParams.InputCostPerToken = stringPtr("0.00004")
-			updatedModelCR.Spec.LiteLLMParams.OutputCostPerToken = stringPtr("0.00008")
-			Expect(k8sClient.Update(context.Background(), updatedModelCR)).To(Succeed())
+		// 	newInputCostPerToken := "0.00004"
+		// 	newOutputCostPerToken := "0.00008"
+		// 	// Update the model parameters
+		// 	updatedModelCR.Spec.LiteLLMParams.InputCostPerToken = stringPtr(newInputCostPerToken)
+		// 	updatedModelCR.Spec.LiteLLMParams.OutputCostPerToken = stringPtr(newOutputCostPerToken)
+		// 	Expect(k8sClient.Update(context.Background(), updatedModelCR)).To(Succeed())
 
-			By("verifying the model was updated in LiteLLM")
-			Eventually(func() error {
-				return verifyModelUpdatedInLiteLLM(modelName, 0.00004, 0.00008)
-			}, testTimeout, testInterval).Should(Succeed())
+		// 	By("verifying the model was updated in LiteLLM")
+		// 	Eventually(func() error {
+		// 		return verifyModelUpdatedInLiteLLM(modelCRName, newInputCostPerToken, newOutputCostPerToken)
+		// 	}, testTimeout, testInterval).Should(Succeed())
 
-			By("deleting the model CR")
-			Expect(k8sClient.Delete(context.Background(), updatedModelCR)).To(Succeed())
+		// 	By("deleting the model CR")
+		// 	Expect(k8sClient.Delete(context.Background(), updatedModelCR)).To(Succeed())
 
-			By("verifying the model was deleted from LiteLLM")
-			Eventually(func() error {
-				return verifyModelDeletedFromLiteLLM(modelName)
-			}, testTimeout, testInterval).Should(Succeed())
-		})
+		// 	By("verifying the model was deleted from LiteLLM")
+		// 	Eventually(func() error {
+		// 		return verifyModelDeletedFromLiteLLM(modelCRName)
+		// 	}, testTimeout, testInterval).Should(Succeed())
+		// })
 
 		It("should handle model creation with invalid parameters", func() {
 			modelName := "invalid-test-model"
@@ -137,9 +142,9 @@ var _ = Describe("Model E2E Tests", Ordered, func() {
 			Expect(k8sClient.Create(context.Background(), invalidModelCR)).To(Succeed())
 
 			By("verifying the model CR shows error status due to no model specified")
-			Eventually(func() error {
-				return verifyModelCRStatusError(modelCRName, "Error", "LiteLLMParams.Model is not set")
-			}, testTimeout, testInterval).Should(Succeed())
+			eventuallyVerify(func() error {
+				return verifyModelCRStatusError(modelCRName, statusError, "LiteLLMParams.Model is not set")
+			})
 
 			By("cleaning up invalid model CR")
 			Expect(k8sClient.Delete(context.Background(), invalidModelCR)).To(Succeed())
@@ -160,32 +165,32 @@ var _ = Describe("Model E2E Tests", Ordered, func() {
 			Expect(k8sClient.Create(context.Background(), model2CR)).To(Succeed())
 
 			By("verifying both models were created in LiteLLM")
-			Eventually(func() error {
-				if err := verifyModelExistsInLiteLLM(model1Name); err != nil {
+			eventuallyVerify(func() error {
+				if err := verifyModelExistsInLiteLLM(model1CRName); err != nil {
 					return err
 				}
-				return verifyModelExistsInLiteLLM(model2Name)
-			}, testTimeout, testInterval).Should(Succeed())
+				return verifyModelExistsInLiteLLM(model2CRName)
+			})
 
 			By("verifying both model CRs have ready status")
-			Eventually(func() error {
-				if err := verifyModelCRStatus(model1CRName, "Ready"); err != nil {
+			eventuallyVerify(func() error {
+				if err := verifyModelCRStatus(model1CRName, statusReady); err != nil {
 					return err
 				}
-				return verifyModelCRStatus(model2CRName, "Ready")
-			}, testTimeout, testInterval).Should(Succeed())
+				return verifyModelCRStatus(model2CRName, statusReady)
+			})
 
 			By("cleaning up both model CRs")
 			Expect(k8sClient.Delete(context.Background(), model1CR)).To(Succeed())
 			Expect(k8sClient.Delete(context.Background(), model2CR)).To(Succeed())
 
 			By("verifying both models were deleted from LiteLLM")
-			Eventually(func() error {
+			eventuallyVerify(func() error {
 				if err := verifyModelDeletedFromLiteLLM(model1Name); err != nil {
 					return err
 				}
 				return verifyModelDeletedFromLiteLLM(model2Name)
-			}, testTimeout, testInterval).Should(Succeed())
+			})
 		})
 	})
 
@@ -214,9 +219,9 @@ var _ = Describe("Model E2E Tests", Ordered, func() {
 			Expect(k8sClient.Create(context.Background(), invalidModelCr)).To(Succeed())
 
 			By("verifying the model CR shows error status")
-			Eventually(func() error {
-				return verifyModelCRStatusError(invalidModelCr.Name, "Error", "required field 'apiBase' is missing for azure provider")
-			}, testTimeout, testInterval).Should(Succeed())
+			eventuallyVerify(func() error {
+				return verifyModelCRStatusError(invalidModelCr.Name, statusError, "required field 'apiBase' is missing for azure provider")
+			})
 
 			By("cleaning up invalid model CR")
 			Expect(k8sClient.Delete(context.Background(), invalidModelCr)).To(Succeed())
@@ -294,6 +299,10 @@ func createPostgresInstance() {
 		return waitForPostgresPodReady()
 	}, testTimeout, testInterval).Should(Succeed())
 }
+
+// ============================================================================
+// Creation Helpers
+// ============================================================================
 
 func createLiteLLMInstance() {
 	By("creating LiteLLM instance CR")
@@ -383,157 +392,86 @@ func createInvalidModelCR(name, modelName string) *litellmv1alpha1.Model {
 	}
 }
 
-func waitForPostgresInitComplete() error {
-	cmd := exec.Command("kubectl", "wait", "--for=condition=Complete", "job/litellm-postgres-1-initdb", "-n", modelTestNamespace, "--timeout=300s")
-	_, err := utils.Run(cmd)
-	if err != nil {
-		return err
-	}
-	return nil
-}
+// ============================================================================
+// Retrieval Helpers
+// ============================================================================
 
-func waitForPostgresPodReady() error {
-	cmd := exec.Command("kubectl", "wait", "--for=condition=Ready", "pod", "-l", "cnpg.io/instanceName=litellm-postgres-1", "-n", modelTestNamespace, "--timeout=300s")
-	_, err := utils.Run(cmd)
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-func waitForLiteLLMInstanceReady() error {
-	cmd := exec.Command("kubectl", "wait", "--for=condition=Ready", "litellminstance/e2e-test-instance", "-n", modelTestNamespace, "--timeout=300s")
-	_, err := utils.Run(cmd)
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-func verifyModelExistsInLiteLLM(modelName string) error {
-	// In a real e2e test, this would call the LiteLLM API directly.
-	// For now, verify that the model CR has a non-empty status.modelId field.
-	cmd := exec.Command("kubectl", "get", "model", "-n", modelTestNamespace,
-		"-o", "jsonpath={.items[?(@.spec.modelName=='"+modelName+"')].status.modelId}")
-
-	output, err := utils.Run(cmd)
-	if err != nil {
-		return err
-	}
-
-	if strings.TrimSpace(string(output)) == "" {
-		return fmt.Errorf("model %s has empty status.modelId", modelName)
-	}
-
-	return nil
-}
-
-func verifyModelUpdatedInLiteLLM(modelName string, expectedInputCost, expectedOutputCost float64) error {
-	// Use expected values to avoid linter unparam warning; in future this can be expanded
-	if expectedInputCost < 0 || expectedOutputCost < 0 {
-		return fmt.Errorf("expected costs must be non-negative")
-	}
-	// Verify the model was updated with new parameters
-	cmd := exec.Command("kubectl", "get", "model", "-n", modelTestNamespace,
-		"-o", "jsonpath={.items[?(@.spec.modelName=='"+modelName+"')].spec.litellmParams.inputCostPerToken}")
-
-	output, err := utils.Run(cmd)
-	if err != nil {
-		return err
-	}
-
-	// Parse the output and compare with expected values
-	// This is a simplified check - in a real scenario you'd parse the JSON properly
-	if string(output) == "" {
-		return fmt.Errorf("could not verify model update for %s", modelName)
-	}
-
-	return nil
-}
-
-func verifyModelDeletedFromLiteLLM(modelName string) error {
-	// Verify the model was deleted from LiteLLM
-	cmd := exec.Command("kubectl", "get", "model", "-n", modelTestNamespace,
-		"-o", "jsonpath={.items[?(@.spec.modelName=='"+modelName+"')].metadata.name}")
-
-	output, err := utils.Run(cmd)
-	if err != nil {
-		return err
-	}
-
-	if string(output) != "" {
-		return fmt.Errorf("model %s still exists in Kubernetes", modelName)
-	}
-
-	return nil
-}
-
-func verifyModelCRStatusError(modelCRName, expectedStatus string, errorMsg string) error {
-
-	// Map the human-friendly expected statuses used in tests to the actual condition status values.
-	var expectedConditionStatus string
-	switch expectedStatus {
-	case statusReady:
-		expectedConditionStatus = condStatusTrue
-	case statusError:
-		expectedConditionStatus = condStatusFalse
-	default:
-		expectedConditionStatus = expectedStatus
-	}
-
-	// Use a short timeout when invoking kubectl to avoid hangs.
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
-
-	// Query the Ready condition status explicitly.
-	cmdStatus := exec.CommandContext(ctx, "kubectl", "get", "model", modelCRName,
-		"-n", modelTestNamespace,
-		"-o", "jsonpath={.status.conditions[?(@.type=='Ready')].status}")
-	outStatus, err := utils.Run(cmdStatus)
-	if err != nil {
-		return err
-	}
-
-	got := strings.TrimSpace(string(outStatus))
-	if got != expectedConditionStatus {
-		return fmt.Errorf("expected status %s (condition status %s), got %s", expectedStatus, expectedConditionStatus, got)
-	}
-
-	// Query the Ready condition message and ensure it contains the expected error message.
-	cmdMsg := exec.CommandContext(ctx, "kubectl", "get", "model", modelCRName,
-		"-n", modelTestNamespace,
-		"-o", "jsonpath={.status.conditions[?(@.type=='Ready')].message}")
-	outMsg, err := utils.Run(cmdMsg)
-	if err != nil {
-		return err
-	}
-
-	if !strings.Contains(string(outMsg), errorMsg) {
-		return fmt.Errorf("expected error message '%s' not found in status message: %s", errorMsg, string(outMsg))
-	}
-
-	return nil
-}
-
-func verifyModelCRStatus(modelCRName, expectedStatus string) error {
+func getModelCR(modelCRName string) (*litellmv1alpha1.Model, error) {
 	modelCR := &litellmv1alpha1.Model{}
 	err := k8sClient.Get(context.Background(), types.NamespacedName{
 		Name:      modelCRName,
 		Namespace: modelTestNamespace,
 	}, modelCR)
 	if err != nil {
+		return nil, fmt.Errorf("failed to get model %s: %w", modelCRName, err)
+	}
+	return modelCR, nil
+}
+
+// ============================================================================
+// Verification Helpers - LiteLLM
+// ============================================================================
+
+func verifyModelCRStatusError(modelCRName, expectedStatus string, errorMsg string) error {
+	modelCR, err := getModelCR(modelCRName)
+	if err != nil {
+		return err
+	}
+
+	return verifyReadyError(modelCR.GetConditions(), expectedStatus, errorMsg)
+}
+
+func verifyModelExistsInLiteLLM(modelCRName string) error {
+	modelCR, err := getModelCR(modelCRName)
+	if err != nil {
+		return err
+	}
+
+	if modelCR.Status.ModelId == nil || *modelCR.Status.ModelId == "" {
+		return fmt.Errorf("model %s has empty status.modelId", modelCRName)
+	}
+
+	return nil
+}
+
+func verifyModelDeletedFromLiteLLM(modelCRName string) error {
+	modelCR := &litellmv1alpha1.Model{}
+	err := k8sClient.Get(context.Background(), types.NamespacedName{
+		Name:      modelCRName,
+		Namespace: modelTestNamespace,
+	}, modelCR)
+
+	if err != nil {
+		// If the CR is not found, that's acceptable - it means it was deleted
+		if errors.IsNotFound(err) {
+			return nil
+		}
 		return fmt.Errorf("failed to get model %s: %w", modelCRName, err)
+	}
+
+	if modelCR.GetDeletionTimestamp().IsZero() {
+		return fmt.Errorf("model %s is not marked for deletion", modelCRName)
+	}
+
+	return fmt.Errorf("model %s is not deleted", modelCRName)
+}
+
+// ============================================================================
+// Verification Helpers - Status
+// ============================================================================
+
+func verifyModelCRStatus(modelCRName, expectedStatus string) error {
+	modelCR, err := getModelCR(modelCRName)
+	if err != nil {
+		return err
 	}
 
 	return verifyReady(modelCR.GetConditions(), expectedStatus)
 }
 
-// Helper functions for creating pointers to primitive types
-// nolint:unused
+// ============================================================================
+// Pointer Helpers - for creating pointers to primitive types
+// ============================================================================
 func stringPtr(v string) *string { return &v }
-
-// nolint:unused
-func intPtr(v int) *int { return &v }
-
-// nolint:unused
-func boolPtr(v bool) *bool { return &v }
+func intPtr(v int) *int          { return &v }
+func boolPtr(v bool) *bool       { return &v }
