@@ -438,8 +438,7 @@ func verifyKeySecretCreated(keyCRName string) error {
 	}
 
 	// Verify secret actually exists
-	_, err = getSecret(virtualKeyCR.Status.KeySecretRef)
-	return err
+	return getSecret(virtualKeyCR.Status.KeySecretRef)
 }
 
 // deleteVirtualKeyCR deletes a virtual key CR by name

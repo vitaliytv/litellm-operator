@@ -62,7 +62,7 @@ var _ = Describe("Integration E2E Tests", Ordered, func() {
 
 			By("verifying all resources are ready")
 			eventuallyVerify(func() error {
-				if err := verifyTeamCRStatus(teamCRName, statusReady); err != nil {
+				if err := verifyTeamCRStatus(teamCRName); err != nil {
 					return fmt.Errorf("team not ready: %v", err)
 				}
 				if err := verifyUserCRStatus(userCRName, statusReady); err != nil {

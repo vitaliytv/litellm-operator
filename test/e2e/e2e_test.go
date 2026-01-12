@@ -186,7 +186,7 @@ func eventuallyVerify(verifyFn func() error) {
 }
 
 // getSecret retrieves a secret by name
-func getSecret(secretName string) (*corev1.Secret, error) {
+func getSecret(secretName string) error {
 	secretCR := &corev1.Secret{}
 	err := k8sClient.Get(context.Background(), types.NamespacedName{
 		Name:      secretName,
@@ -195,16 +195,16 @@ func getSecret(secretName string) (*corev1.Secret, error) {
 	if err != nil {
 		// Don't wrap NotFound errors so they can be checked with errors.IsNotFound
 		if errors.IsNotFound(err) {
-			return nil, err
+			return err
 		}
-		return nil, fmt.Errorf("failed to get secret %s: %w", secretName, err)
+		return fmt.Errorf("failed to get secret %s: %w", secretName, err)
 	}
-	return secretCR, nil
+	return nil
 }
 
 // verifySecretDeleted verifies that a secret has been deleted from Kubernetes
 func verifySecretDeleted(secretName string) error {
-	_, err := getSecret(secretName)
+	err := getSecret(secretName)
 
 	if err != nil {
 		if errors.IsNotFound(err) {

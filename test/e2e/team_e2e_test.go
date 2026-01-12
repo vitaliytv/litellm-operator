@@ -65,7 +65,7 @@ var _ = Describe("Team E2E Tests", Ordered, func() {
 
 			By("verifying team CR has ready status")
 			eventuallyVerify(func() error {
-				return verifyTeamCRStatus(teamCRName, statusReady)
+				return verifyTeamCRStatus(teamCRName)
 			})
 
 			By("updating the team CR")
@@ -153,10 +153,10 @@ var _ = Describe("Team E2E Tests", Ordered, func() {
 
 			By("verifying both team CRs have ready status")
 			eventuallyVerify(func() error {
-				if err := verifyTeamCRStatus(team1CRName, statusReady); err != nil {
+				if err := verifyTeamCRStatus(team1CRName); err != nil {
 					return err
 				}
-				return verifyTeamCRStatus(team2CRName, statusReady)
+				return verifyTeamCRStatus(team2CRName)
 			})
 
 			By("cleaning up both team CRs")
@@ -184,7 +184,7 @@ var _ = Describe("Team E2E Tests", Ordered, func() {
 
 			By("waiting for team CR to be ready")
 			eventuallyVerify(func() error {
-				return verifyTeamCRStatus(teamCRName, statusReady)
+				return verifyTeamCRStatus(teamCRName)
 			})
 
 			By("trying to update the immutable teamAlias field")
@@ -353,11 +353,11 @@ func verifyTeamBudgetDuration(teamCRName, expectedDuration string) error {
 // Verification Helpers - Status
 // ============================================================================
 
-func verifyTeamCRStatus(teamCRName, expectedStatus string) error {
+func verifyTeamCRStatus(teamCRName string) error {
 	teamCR, err := getTeamCR(teamCRName)
 	if err != nil {
 		return err
 	}
 
-	return verifyReady(teamCR.GetConditions(), expectedStatus)
+	return verifyReady(teamCR.GetConditions(), statusReady)
 }
