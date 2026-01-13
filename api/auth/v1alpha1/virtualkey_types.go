@@ -168,10 +168,10 @@ type VirtualKeyStatus struct {
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
 // +kubebuilder:printcolumn:name="Ready",type="string",JSONPath=".status.conditions[?(@.type=='Ready')].status",description="The ready status of the key"
-// +kubebuilder:printcolumn:name="Alias",type="string",JSONPath=".spec.keyAlias",description="The key alias"
-// +kubebuilder:printcolumn:name="Owner",type="string",JSONPath=".spec.userID",description="The associated user/team ID"
-// +kubebuilder:printcolumn:name="Blocked",type="boolean",JSONPath=".spec.blocked",description="Whether the key is blocked"
-// +kubebuilder:printcolumn:name="Budget",type="string",JSONPath=".spec.maxBudget",description="Maximum budget for the key"
+// +kubebuilder:printcolumn:name="Alias",type="string",JSONPath=".status.keyAlias",description="The key alias"
+// +kubebuilder:printcolumn:name="Owner",type="string",JSONPath=".status.userID",description="The associated user/team ID"
+// +kubebuilder:printcolumn:name="Blocked",type="boolean",JSONPath=".status.blocked",description="Whether the key is blocked"
+// +kubebuilder:printcolumn:name="Budget",type="string",JSONPath=".status.maxBudget",description="Maximum budget for the key"
 // +kubebuilder:printcolumn:name="Spend",type="string",JSONPath=".status.spend",description="Current key spend"
 // +kubebuilder:printcolumn:name="Age",type="date",JSONPath=".metadata.creationTimestamp",description="Time since creation"
 

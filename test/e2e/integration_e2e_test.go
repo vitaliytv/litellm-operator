@@ -19,8 +19,6 @@ package e2e
 import (
 	"context"
 	"fmt"
-	"os/exec"
-	"strings"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -29,7 +27,6 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 
 	authv1alpha1 "github.com/bbdsoftware/litellm-operator/api/auth/v1alpha1"
-	"github.com/bbdsoftware/litellm-operator/test/utils"
 )
 
 // Use status constants from model_e2e_test.go
@@ -64,7 +61,7 @@ var _ = Describe("Integration E2E Tests", Ordered, func() {
 			Expect(k8sClient.Create(context.Background(), keyCR)).To(Succeed())
 
 			By("verifying all resources are ready")
-			Eventually(func() error {
+			eventuallyVerify(func() error {
 				if err := verifyTeamCRStatus(teamCRName); err != nil {
 					return fmt.Errorf("team not ready: %v", err)
 				}
@@ -78,12 +75,12 @@ var _ = Describe("Integration E2E Tests", Ordered, func() {
 					return fmt.Errorf("virtual key not ready: %v", err)
 				}
 				return nil
-			}, testTimeout, testInterval).Should(Succeed())
+			})
 
 			By("verifying team membership is established")
-			Eventually(func() error {
-				return verifyTeamMembership(teamAlias, userEmail)
-			}, testTimeout, testInterval).Should(Succeed())
+			eventuallyVerify(func() error {
+				return verifyTeamMembership(associationCRName, teamAlias, userEmail)
+			})
 
 			// TODO: Uncomment this when we have a way to update user role in team
 			// By("updating user role in team")
@@ -98,29 +95,29 @@ var _ = Describe("Integration E2E Tests", Ordered, func() {
 
 			By("cleaning up all resources")
 			Expect(k8sClient.Delete(context.Background(), associationCR)).To(Succeed())
-			Eventually(func() error {
+			eventuallyVerify(func() error {
 				if err := verifyTeamMemberAssociationDeletedFromLiteLLM(associationCRName); err != nil {
 					return fmt.Errorf("association not deleted: %v", err)
 				}
 				return nil
-			}, testTimeout, testInterval).Should(Succeed())
+			})
 			Expect(k8sClient.Delete(context.Background(), keyCR)).To(Succeed())
 			Expect(k8sClient.Delete(context.Background(), userCR)).To(Succeed())
 			Expect(k8sClient.Delete(context.Background(), teamCR)).To(Succeed())
 
 			By("verifying all resources are deleted")
-			Eventually(func() error {
-				if err := verifyVirtualKeyDeletedFromLiteLLM(keyAlias); err != nil {
+			eventuallyVerify(func() error {
+				if err := verifyVirtualKeyDeletedFromLiteLLM(keyCRName); err != nil {
 					return fmt.Errorf("virtual key still exists: %v", err)
 				}
-				if err := verifyUserDeletedFromLiteLLM(userEmail); err != nil {
+				if err := verifyUserDeletedFromLiteLLM(userCRName); err != nil {
 					return fmt.Errorf("user still exists: %v", err)
 				}
-				if err := verifyTeamDeletedFromLiteLLM(teamAlias); err != nil {
+				if err := verifyTeamDeletedFromLiteLLM(teamCRName); err != nil {
 					return fmt.Errorf("team still exists: %v", err)
 				}
 				return nil
-			}, testTimeout, testInterval).Should(Succeed())
+			})
 		})
 
 		It("should handle team budget inheritance and validation", func() {
@@ -150,19 +147,19 @@ var _ = Describe("Integration E2E Tests", Ordered, func() {
 			Expect(k8sClient.Create(context.Background(), keyCR)).To(Succeed())
 
 			By("verifying budget hierarchy is respected")
-			Eventually(func() error {
+			eventuallyVerify(func() error {
 				return verifyBudgetHierarchy(teamAlias, userEmail, keyAlias)
-			}, testTimeout, testInterval).Should(Succeed())
+			})
 
 			By("cleaning up budget test resources")
 			Expect(k8sClient.Delete(context.Background(), keyCR)).To(Succeed())
 			Expect(k8sClient.Delete(context.Background(), associationCR)).To(Succeed())
-			Eventually(func() error {
+			eventuallyVerify(func() error {
 				if err := verifyTeamMemberAssociationDeletedFromLiteLLM(associationCRName); err != nil {
 					return fmt.Errorf("association not deleted: %v", err)
 				}
 				return nil
-			}, testTimeout, testInterval).Should(Succeed())
+			})
 			Expect(k8sClient.Delete(context.Background(), userCR)).To(Succeed())
 			Expect(k8sClient.Delete(context.Background(), teamCR)).To(Succeed())
 		})
@@ -249,20 +246,22 @@ var _ = Describe("Integration E2E Tests", Ordered, func() {
 			Expect(k8sClient.Delete(context.Background(), teamCR)).To(Succeed())
 
 			By("verifying all resources are deleted")
-			Eventually(func() error {
-				if err := verifyUserDeletedFromLiteLLM(userEmail); err != nil {
+			eventuallyVerify(func() error {
+				if err := verifyUserDeletedFromLiteLLM(userCRName); err != nil {
 					return fmt.Errorf("user still exists: %v", err)
 				}
-				if err := verifyTeamDeletedFromLiteLLM(teamAlias); err != nil {
+				if err := verifyTeamDeletedFromLiteLLM(teamCRName); err != nil {
 					return fmt.Errorf("team still exists: %v", err)
 				}
 				return nil
-			}, testTimeout, testInterval).Should(Succeed())
+			})
 		})
 	})
 })
 
-// Helper functions for integration tests
+// ============================================================================
+// Creation Helpers
+// ============================================================================
 
 func createIntegrationTeamCR(name, teamAlias string) *authv1alpha1.Team {
 	return &authv1alpha1.Team{
@@ -383,21 +382,41 @@ func createVirtualKeyWithBudget(name, keyAlias, userEmail, budget string) *authv
 	return key
 }
 
-// Verification functions
+// ============================================================================
+// Retrieval Helpers
+// ============================================================================
 
-func verifyTeamMembership(teamAlias, userEmail string) error {
-	cmd := exec.Command("sh", "-c", fmt.Sprintf("kubectl get teammemberassociation -n %s -o json | jq -r '.items[] | select(.status.teamAlias==\"%s\" and .status.userEmail==\"%s\") | .metadata.name'", modelTestNamespace, teamAlias, userEmail))
+func getTeamMemberAssociationCR(associationCRName string) (*authv1alpha1.TeamMemberAssociation, error) {
+	association := &authv1alpha1.TeamMemberAssociation{}
+	err := k8sClient.Get(context.Background(), types.NamespacedName{
+		Name:      associationCRName,
+		Namespace: modelTestNamespace,
+	}, association)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get team member association %s: %w", associationCRName, err)
+	}
+	return association, nil
+}
 
-	output, err := utils.Run(cmd)
+// ============================================================================
+// Verification Helpers - LiteLLM
+// ============================================================================
+
+func verifyTeamMembership(associationCRName, teamAlias, userEmail string) error {
+	association, err := getTeamMemberAssociationCR(associationCRName)
 	if err != nil {
 		return err
 	}
 
-	if strings.TrimSpace(string(output)) == "" {
-		return fmt.Errorf("team membership not found for user %s in team %s", userEmail, teamAlias)
+	if association.Status.TeamAlias != teamAlias {
+		return fmt.Errorf("team alias mismatch: expected %s, got %s", teamAlias, association.Status.TeamAlias)
 	}
 
-	return nil
+	if association.Status.UserEmail != userEmail {
+		return fmt.Errorf("user email mismatch: expected %s, got %s", userEmail, association.Status.UserEmail)
+	}
+
+	return verifyReady(association.GetConditions(), statusReady)
 }
 
 func verifyBudgetHierarchy(teamAlias, userEmail, keyAlias string) error {
@@ -437,36 +456,5 @@ func verifyTeamMemberAssociationDeletedFromLiteLLM(associationCRName string) err
 	}
 
 	// Resource not found means it was successfully deleted
-	return nil
-}
-
-func verifyReady(conditions []metav1.Condition, expectedStatus string) error {
-	var readyCondition *metav1.Condition
-	for i := range conditions {
-		if conditions[i].Type == "Ready" {
-			readyCondition = &conditions[i]
-			break
-		}
-	}
-
-	if readyCondition == nil {
-		return fmt.Errorf("Ready condition not found")
-	}
-
-	got := string(readyCondition.Status)
-	var expectedConditionStatus string
-	switch expectedStatus {
-	case statusReady:
-		expectedConditionStatus = condStatusTrue
-	case statusError:
-		expectedConditionStatus = condStatusFalse
-	default:
-		expectedConditionStatus = expectedStatus
-	}
-
-	if got != expectedConditionStatus {
-		return fmt.Errorf("expected status %s (condition status %s), got %s", expectedStatus, expectedConditionStatus, got)
-	}
-
 	return nil
 }

@@ -19,11 +19,10 @@ package e2e
 import (
 	"context"
 	"fmt"
-	"os/exec"
-	"strings"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes/scheme"
@@ -31,7 +30,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
 
 	authv1alpha1 "github.com/bbdsoftware/litellm-operator/api/auth/v1alpha1"
-	"github.com/bbdsoftware/litellm-operator/test/utils"
 )
 
 func init() {
@@ -61,39 +59,38 @@ var _ = Describe("User E2E Tests", Ordered, func() {
 			Expect(k8sClient.Create(context.Background(), userCR)).To(Succeed())
 
 			By("verifying the user was created in LiteLLM")
-			Eventually(func() error {
-				return verifyUserExistsInLiteLLM(userEmail)
-			}, testTimeout, testInterval).Should(Succeed())
+			eventuallyVerify(func() error {
+				return verifyUserExistsInLiteLLM(userCRName)
+			})
 
 			By("verifying user CR has ready status")
-			Eventually(func() error {
-				return verifyUserCRStatus(userCRName, "Ready")
-			}, testTimeout, testInterval).Should(Succeed())
+			eventuallyVerify(func() error {
+				return verifyUserCRStatus(userCRName, statusReady)
+			})
 
 			By("updating the user CR")
-			updatedUserCR := &authv1alpha1.User{}
-			Expect(k8sClient.Get(context.Background(), types.NamespacedName{
-				Name:      userCRName,
-				Namespace: modelTestNamespace,
-			}, updatedUserCR)).To(Succeed())
+			updatedUserCR, err := getUserCR(userCRName)
+			Expect(err).NotTo(HaveOccurred())
 
 			// Update user properties
-			updatedUserCR.Spec.MaxBudget = "20"
-			updatedUserCR.Spec.RPMLimit = 200
+			newBudget := "20"
+			newRPM := 200
+			updatedUserCR.Spec.MaxBudget = newBudget
+			updatedUserCR.Spec.RPMLimit = newRPM
 			Expect(k8sClient.Update(context.Background(), updatedUserCR)).To(Succeed())
 
 			By("verifying the user was updated in LiteLLM")
-			Eventually(func() error {
-				return verifyUserUpdatedInLiteLLM(userEmail, "20", 200)
-			}, testTimeout, testInterval).Should(Succeed())
+			eventuallyVerify(func() error {
+				return verifyUserUpdatedInLiteLLM(userCRName, newBudget, newRPM)
+			})
 
 			By("deleting the user CR")
 			Expect(k8sClient.Delete(context.Background(), updatedUserCR)).To(Succeed())
 
 			By("verifying the user was deleted from LiteLLM")
-			Eventually(func() error {
-				return verifyUserDeletedFromLiteLLM(userEmail)
-			}, testTimeout, testInterval).Should(Succeed())
+			eventuallyVerify(func() error {
+				return verifyUserDeletedFromLiteLLM(userCRName)
+			})
 		})
 
 		It("should handle user with auto-create key", func() {
@@ -105,12 +102,12 @@ var _ = Describe("User E2E Tests", Ordered, func() {
 			Expect(k8sClient.Create(context.Background(), userCR)).To(Succeed())
 
 			By("verifying the user was created with a key")
-			Eventually(func() error {
-				return verifyUserKeyCreated(userEmail)
-			}, testTimeout, testInterval).Should(Succeed())
+			eventuallyVerify(func() error {
+				return verifyUserKeyCreated(userCRName)
+			})
 
 			By("cleaning up user CR")
-			Expect(k8sClient.Delete(context.Background(), userCR)).To(Succeed())
+			Expect(deleteUserCR(userCRName)).To(Succeed())
 		})
 	})
 
@@ -124,25 +121,16 @@ var _ = Describe("User E2E Tests", Ordered, func() {
 			Expect(k8sClient.Create(context.Background(), userCR)).To(Succeed())
 
 			By("trying to update the immutable userEmail field")
-			updatedUserCR := &authv1alpha1.User{}
-			Expect(k8sClient.Get(context.Background(), types.NamespacedName{
-				Name:      userCRName,
-				Namespace: modelTestNamespace,
-			}, updatedUserCR)).To(Succeed())
+			updatedUserCR, err := getUserCR(userCRName)
+			Expect(err).NotTo(HaveOccurred())
 
 			updatedUserCR.Spec.UserEmail = "new-email@example.com"
-			err := k8sClient.Update(context.Background(), updatedUserCR)
+			err = k8sClient.Update(context.Background(), updatedUserCR)
 			Expect(err).To(HaveOccurred())
 			Expect(err.Error()).To(ContainSubstring("UserEmail is immutable"))
 
 			By("cleaning up user CR")
-			// Get the original CR again since update failed
-			originalUserCR := &authv1alpha1.User{}
-			Expect(k8sClient.Get(context.Background(), types.NamespacedName{
-				Name:      userCRName,
-				Namespace: modelTestNamespace,
-			}, originalUserCR)).To(Succeed())
-			Expect(k8sClient.Delete(context.Background(), originalUserCR)).To(Succeed())
+			Expect(deleteUserCR(userCRName)).To(Succeed())
 		})
 
 		It("should validate user role enum", func() {
@@ -155,6 +143,7 @@ var _ = Describe("User E2E Tests", Ordered, func() {
 			err := k8sClient.Create(context.Background(), invalidUserCR)
 			Expect(err).To(HaveOccurred())
 			Expect(err.Error()).To(ContainSubstring("spec.userRole"))
+			// no need to clean up user CR as it was not created
 		})
 	})
 })
@@ -191,94 +180,115 @@ func createUserWithAutoKey(name, email string) *authv1alpha1.User {
 	return userCR
 }
 
-func verifyUserExistsInLiteLLM(userEmail string) error {
-	cmd := exec.Command("kubectl", "get", "user", "-n", modelTestNamespace,
-		"-o", "jsonpath={.items[?(@.spec.userEmail=='"+userEmail+"')].status.userID}")
-
-	output, err := utils.Run(cmd)
+func verifyUserUpdatedInLiteLLM(userCRName, expectedBudget string, expectedRPM int) error {
+	userCR, err := getUserCR(userCRName)
 	if err != nil {
 		return err
 	}
 
-	if strings.TrimSpace(string(output)) == "" {
-		return fmt.Errorf("user %s has empty status.userID", userEmail)
-	}
-
-	return nil
-}
-
-func verifyUserUpdatedInLiteLLM(userEmail, expectedBudget string, expectedRPM int) error {
 	// Verify budget
-	cmd := exec.Command("kubectl", "get", "user", "-n", modelTestNamespace,
-		"-o", "jsonpath={.items[?(@.spec.userEmail=='"+userEmail+"')].spec.maxBudget}")
-
-	output, err := utils.Run(cmd)
-	if err != nil {
+	if err := compareBudgetStrings(expectedBudget, userCR.Status.MaxBudget); err != nil {
 		return err
-	}
-
-	if strings.TrimSpace(string(output)) != expectedBudget {
-		return fmt.Errorf("expected budget %s, got %s", expectedBudget, string(output))
 	}
 
 	// Verify RPM limit
-	cmd = exec.Command("kubectl", "get", "user", "-n", modelTestNamespace,
-		"-o", "jsonpath={.items[?(@.spec.userEmail=='"+userEmail+"')].spec.rpmLimit}")
-
-	output, err = utils.Run(cmd)
-	if err != nil {
-		return err
-	}
-
-	actualRPM := strings.TrimSpace(string(output))
-	if actualRPM != fmt.Sprintf("%d", expectedRPM) {
-		return fmt.Errorf("expected RPM limit %d, got %s", expectedRPM, actualRPM)
+	if userCR.Status.RPMLimit != expectedRPM {
+		return fmt.Errorf("expected RPM limit %d, got %d", expectedRPM, userCR.Status.RPMLimit)
 	}
 
 	return nil
 }
 
-func verifyUserDeletedFromLiteLLM(userEmail string) error {
-	cmd := exec.Command("kubectl", "get", "user", "-n", modelTestNamespace,
-		"-o", "jsonpath={.items[?(@.spec.userEmail=='"+userEmail+"')].metadata.name}")
+// ============================================================================
+// Retrieval Helpers
+// ============================================================================
 
-	output, err := utils.Run(cmd)
-	if err != nil {
-		return err
-	}
-
-	if string(output) != "" {
-		return fmt.Errorf("user %s still exists in Kubernetes", userEmail)
-	}
-
-	return nil
-}
-
-func verifyUserKeyCreated(userEmail string) error {
-	cmd := exec.Command("kubectl", "get", "user", "-n", modelTestNamespace,
-		"-o", "jsonpath={.items[?(@.spec.userEmail=='"+userEmail+"')].status.keySecretRef}")
-
-	output, err := utils.Run(cmd)
-	if err != nil {
-		return err
-	}
-
-	if strings.TrimSpace(string(output)) == "" {
-		return fmt.Errorf("user %s has no key secret reference", userEmail)
-	}
-
-	return nil
-}
-
-func verifyUserCRStatus(userCRName, expectedStatus string) error {
+func getUserCR(userCRName string) (*authv1alpha1.User, error) {
 	userCR := &authv1alpha1.User{}
 	err := k8sClient.Get(context.Background(), types.NamespacedName{
 		Name:      userCRName,
 		Namespace: modelTestNamespace,
 	}, userCR)
 	if err != nil {
+		return nil, fmt.Errorf("failed to get user %s: %w", userCRName, err)
+	}
+	return userCR, nil
+}
+
+// ============================================================================
+// Verification Helpers - LiteLLM
+// ============================================================================
+
+func verifyUserExistsInLiteLLM(userCRName string) error {
+	userCR, err := getUserCR(userCRName)
+	if err != nil {
+		return err
+	}
+
+	if userCR.Status.UserID == "" {
+		return fmt.Errorf("user %s has empty status.userID", userCRName)
+	}
+
+	return nil
+}
+
+func verifyUserDeletedFromLiteLLM(userCRName string) error {
+	userCR := &authv1alpha1.User{}
+	err := k8sClient.Get(context.Background(), types.NamespacedName{
+		Name:      userCRName,
+		Namespace: modelTestNamespace,
+	}, userCR)
+
+	if err != nil {
+		// If the CR is not found, that's acceptable - it means it was deleted
+		if errors.IsNotFound(err) {
+			return nil
+		}
 		return fmt.Errorf("failed to get user %s: %w", userCRName, err)
 	}
 
+	if userCR.GetDeletionTimestamp().IsZero() {
+		return fmt.Errorf("user %s is not marked for deletion", userCRName)
+	}
+
+	return fmt.Errorf("user %s is not deleted", userCRName)
+}
+
+func verifyUserKeyCreated(userCRName string) error {
+	userCR, err := getUserCR(userCRName)
+	if err != nil {
+		return err
+	}
+
+	if userCR.Status.KeySecretRef == "" {
+		return fmt.Errorf("user %s has no key secret reference", userCRName)
+	}
+
+	return nil
+}
+
+// ============================================================================
+// Verification Helpers - Status
+// ============================================================================
+
+func verifyUserCRStatus(userCRName, expectedStatus string) error {
+	userCR, err := getUserCR(userCRName)
+	if err != nil {
+		return err
+	}
+
 	return verifyReady(userCR.GetConditions(), expectedStatus)
+}
+
+// ============================================================================
+// Utility Helpers
+// ============================================================================
+
+// deleteUserCR deletes a user CR by name
+func deleteUserCR(userCRName string) error {
+	userCR, err := getUserCR(userCRName)
+	if err != nil {
+		return err
+	}
+	return k8sClient.Delete(context.Background(), userCR)
 }

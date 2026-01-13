@@ -19,11 +19,10 @@ package e2e
 import (
 	"context"
 	"fmt"
-	"os/exec"
-	"strings"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes/scheme"
@@ -31,7 +30,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
 
 	authv1alpha1 "github.com/bbdsoftware/litellm-operator/api/auth/v1alpha1"
-	"github.com/bbdsoftware/litellm-operator/test/utils"
 )
 
 func init() {
@@ -61,14 +59,14 @@ var _ = Describe("Team E2E Tests", Ordered, func() {
 			Expect(k8sClient.Create(context.Background(), teamCR)).To(Succeed())
 
 			By("verifying the team was created in LiteLLM")
-			Eventually(func() error {
-				return verifyTeamExistsInLiteLLM(teamAlias)
-			}, testTimeout, testInterval).Should(Succeed())
+			eventuallyVerify(func() error {
+				return verifyTeamExistsInLiteLLM(teamCRName)
+			})
 
 			By("verifying team CR has ready status")
-			Eventually(func() error {
+			eventuallyVerify(func() error {
 				return verifyTeamCRStatus(teamCRName)
-			}, testTimeout, testInterval).Should(Succeed())
+			})
 
 			By("updating the team CR")
 			updatedTeamCR := &authv1alpha1.Team{}
@@ -78,56 +76,58 @@ var _ = Describe("Team E2E Tests", Ordered, func() {
 			}, updatedTeamCR)).To(Succeed())
 
 			// Update team properties
-			updatedTeamCR.Spec.MaxBudget = "50"
-			updatedTeamCR.Spec.RPMLimit = 500
-			updatedTeamCR.Spec.Models = []string{"gpt-4o", "gpt-3.5-turbo"}
+			newBudget := "50"
+			newRPM := 500
+			updatedTeamCR.Spec.MaxBudget = newBudget
+			updatedTeamCR.Spec.RPMLimit = newRPM
 			Expect(k8sClient.Update(context.Background(), updatedTeamCR)).To(Succeed())
 
 			By("verifying the team was updated in LiteLLM")
-			Eventually(func() error {
-				return verifyTeamUpdatedInLiteLLM(teamAlias, "50", 500)
-			}, testTimeout, testInterval).Should(Succeed())
+			eventuallyVerify(func() error {
+				return verifyTeamUpdatedInLiteLLM(teamCRName, newBudget, newRPM)
+			})
 
 			By("deleting the team CR")
 			Expect(k8sClient.Delete(context.Background(), updatedTeamCR)).To(Succeed())
 
 			By("verifying the team was deleted from LiteLLM")
-			Eventually(func() error {
-				return verifyTeamDeletedFromLiteLLM(teamAlias)
-			}, testTimeout, testInterval).Should(Succeed())
+			eventuallyVerify(func() error {
+				return verifyTeamDeletedFromLiteLLM(teamCRName)
+			})
 		})
 
-		It("should handle team with blocked status", func() {
-			teamAlias := "blocked-team"
-			teamCRName := "blocked-team-cr"
+		// TODO: blocking/unblocking teams uses /team/block and /team/unblock endpoints, which are not yet implemented.
+		// It("should handle team with blocked status", func() {
+		// 	teamAlias := "blocked-team"
+		// 	teamCRName := "blocked-team-cr"
 
-			By("creating a team CR with blocked status")
-			teamCR := createBlockedTeamCR(teamCRName, teamAlias)
-			Expect(k8sClient.Create(context.Background(), teamCR)).To(Succeed())
+		// 	By("creating a team CR with blocked status")
+		// 	teamCR := createBlockedTeamCR(teamCRName, teamAlias)
+		// 	Expect(k8sClient.Create(context.Background(), teamCR)).To(Succeed())
 
-			By("verifying the team was created with blocked status")
-			Eventually(func() error {
-				return verifyTeamBlockedStatus(teamAlias, true)
-			}, testTimeout, testInterval).Should(Succeed())
+		// 	By("verifying the team was created with blocked status")
+		// 	Eventually(func() error {
+		// 		return verifyTeamBlockedStatus(teamCRName, true)
+		// 	}, testTimeout, testInterval).Should(Succeed())
 
-			By("unblocking the team")
-			updatedTeamCR := &authv1alpha1.Team{}
-			Expect(k8sClient.Get(context.Background(), types.NamespacedName{
-				Name:      teamCRName,
-				Namespace: modelTestNamespace,
-			}, updatedTeamCR)).To(Succeed())
+		// 	By("unblocking the team")
+		// 	updatedTeamCR := &authv1alpha1.Team{}
+		// 	Expect(k8sClient.Get(context.Background(), types.NamespacedName{
+		// 		Name:      teamCRName,
+		// 		Namespace: modelTestNamespace,
+		// 	}, updatedTeamCR)).To(Succeed())
 
-			updatedTeamCR.Spec.Blocked = false
-			Expect(k8sClient.Update(context.Background(), updatedTeamCR)).To(Succeed())
+		// 	updatedTeamCR.Spec.Blocked = false
+		// 	Expect(k8sClient.Update(context.Background(), updatedTeamCR)).To(Succeed())
 
-			By("verifying the team is no longer blocked")
-			Eventually(func() error {
-				return verifyTeamBlockedStatus(teamAlias, false)
-			}, testTimeout, testInterval).Should(Succeed())
+		// 	By("verifying the team is no longer blocked")
+		// 	Eventually(func() error {
+		// 		return verifyTeamBlockedStatus(teamCRName, false)
+		// 	}, testTimeout, testInterval).Should(Succeed())
 
-			By("cleaning up team CR")
-			Expect(k8sClient.Delete(context.Background(), updatedTeamCR)).To(Succeed())
-		})
+		// 	By("cleaning up team CR")
+		// 	Expect(k8sClient.Delete(context.Background(), updatedTeamCR)).To(Succeed())
+		// })
 
 		It("should handle multiple teams in the same namespace", func() {
 			team1Alias := "multi-test-team-1"
@@ -144,32 +144,32 @@ var _ = Describe("Team E2E Tests", Ordered, func() {
 			Expect(k8sClient.Create(context.Background(), team2CR)).To(Succeed())
 
 			By("verifying both teams were created in LiteLLM")
-			Eventually(func() error {
-				if err := verifyTeamExistsInLiteLLM(team1Alias); err != nil {
+			eventuallyVerify(func() error {
+				if err := verifyTeamExistsInLiteLLM(team1CRName); err != nil {
 					return err
 				}
-				return verifyTeamExistsInLiteLLM(team2Alias)
-			}, testTimeout, testInterval).Should(Succeed())
+				return verifyTeamExistsInLiteLLM(team2CRName)
+			})
 
 			By("verifying both team CRs have ready status")
-			Eventually(func() error {
+			eventuallyVerify(func() error {
 				if err := verifyTeamCRStatus(team1CRName); err != nil {
 					return err
 				}
 				return verifyTeamCRStatus(team2CRName)
-			}, testTimeout, testInterval).Should(Succeed())
+			})
 
 			By("cleaning up both team CRs")
 			Expect(k8sClient.Delete(context.Background(), team1CR)).To(Succeed())
 			Expect(k8sClient.Delete(context.Background(), team2CR)).To(Succeed())
 
 			By("verifying both teams were deleted from LiteLLM")
-			Eventually(func() error {
-				if err := verifyTeamDeletedFromLiteLLM(team1Alias); err != nil {
+			eventuallyVerify(func() error {
+				if err := verifyTeamDeletedFromLiteLLM(team1CRName); err != nil {
 					return err
 				}
-				return verifyTeamDeletedFromLiteLLM(team2Alias)
-			}, testTimeout, testInterval).Should(Succeed())
+				return verifyTeamDeletedFromLiteLLM(team2CRName)
+			})
 		})
 	})
 
@@ -183,9 +183,9 @@ var _ = Describe("Team E2E Tests", Ordered, func() {
 			Expect(k8sClient.Create(context.Background(), teamCR)).To(Succeed())
 
 			By("waiting for team CR to be ready")
-			Eventually(func() error {
+			eventuallyVerify(func() error {
 				return verifyTeamCRStatus(teamCRName)
-			}, testTimeout, testInterval).Should(Succeed())
+			})
 
 			By("trying to update the immutable teamAlias field")
 			updatedTeamCR := &authv1alpha1.Team{}
@@ -212,20 +212,26 @@ var _ = Describe("Team E2E Tests", Ordered, func() {
 			teamAlias := "budget-duration-team"
 			teamCRName := "budget-duration-team-cr"
 
+			duration := "1h"
+
 			By("creating a team CR with budget duration")
-			teamCR := createTeamWithBudgetDuration(teamCRName, teamAlias)
+			teamCR := createTeamWithBudgetDuration(teamCRName, teamAlias, duration)
 			Expect(k8sClient.Create(context.Background(), teamCR)).To(Succeed())
 
-			By("verifying the team has budget duration set")
-			Eventually(func() error {
-				return verifyTeamBudgetDuration(teamAlias, "1h")
-			}, testTimeout, testInterval).Should(Succeed())
+			By("verifying the team has correct budget duration set")
+			eventuallyVerify(func() error {
+				return verifyTeamBudgetDuration(teamCRName, duration)
+			})
 
 			By("cleaning up team CR")
 			Expect(k8sClient.Delete(context.Background(), teamCR)).To(Succeed())
 		})
 	})
 })
+
+// ============================================================================
+// Creation Helpers
+// ============================================================================
 
 func createTeamCR(name, teamAlias string) *authv1alpha1.Team {
 	return &authv1alpha1.Team{
@@ -250,122 +256,107 @@ func createTeamCR(name, teamAlias string) *authv1alpha1.Team {
 	}
 }
 
-func createBlockedTeamCR(name, teamAlias string) *authv1alpha1.Team {
+func createTeamWithBudgetDuration(name, teamAlias, duration string) *authv1alpha1.Team {
 	teamCR := createTeamCR(name, teamAlias)
-	teamCR.Spec.Blocked = true
+	teamCR.Spec.BudgetDuration = duration
 	return teamCR
 }
 
-func createTeamWithBudgetDuration(name, teamAlias string) *authv1alpha1.Team {
-	teamCR := createTeamCR(name, teamAlias)
-	teamCR.Spec.BudgetDuration = "1h"
-	return teamCR
-}
+// ============================================================================
+// Retrieval Helpers
+// ============================================================================
 
-func verifyTeamExistsInLiteLLM(teamAlias string) error {
-	cmd := exec.Command("kubectl", "get", "team", "-n", modelTestNamespace,
-		"-o", "jsonpath={.items[?(@.spec.teamAlias=='"+teamAlias+"')].status.teamID}")
-
-	output, err := utils.Run(cmd)
-	if err != nil {
-		return err
-	}
-
-	if strings.TrimSpace(string(output)) == "" {
-		return fmt.Errorf("team %s has empty status.teamID", teamAlias)
-	}
-
-	return nil
-}
-
-func verifyTeamUpdatedInLiteLLM(teamAlias, expectedBudget string, expectedRPM int) error {
-	// Verify budget
-	cmd := exec.Command("kubectl", "get", "team", "-n", modelTestNamespace,
-		"-o", "jsonpath={.items[?(@.spec.teamAlias=='"+teamAlias+"')].spec.maxBudget}")
-
-	output, err := utils.Run(cmd)
-	if err != nil {
-		return err
-	}
-
-	if strings.TrimSpace(string(output)) != expectedBudget {
-		return fmt.Errorf("expected budget %s, got %s", expectedBudget, string(output))
-	}
-
-	// Verify RPM limit
-	cmd = exec.Command("kubectl", "get", "team", "-n", modelTestNamespace,
-		"-o", "jsonpath={.items[?(@.spec.teamAlias=='"+teamAlias+"')].spec.rpmLimit}")
-
-	output, err = utils.Run(cmd)
-	if err != nil {
-		return err
-	}
-
-	actualRPM := strings.TrimSpace(string(output))
-	if actualRPM != fmt.Sprintf("%d", expectedRPM) {
-		return fmt.Errorf("expected RPM limit %d, got %s", expectedRPM, actualRPM)
-	}
-
-	return nil
-}
-
-func verifyTeamDeletedFromLiteLLM(teamAlias string) error {
-	cmd := exec.Command("kubectl", "get", "team", "-n", modelTestNamespace,
-		"-o", "jsonpath={.items[?(@.spec.teamAlias=='"+teamAlias+"')].metadata.name}")
-
-	output, err := utils.Run(cmd)
-	if err != nil {
-		return err
-	}
-
-	if string(output) != "" {
-		return fmt.Errorf("team %s still exists in Kubernetes", teamAlias)
-	}
-
-	return nil
-}
-
-func verifyTeamBlockedStatus(teamAlias string, expectedBlocked bool) error {
-	cmd := exec.Command("kubectl", "get", "team", "-n", modelTestNamespace,
-		"-o", "jsonpath={.items[?(@.spec.teamAlias=='"+teamAlias+"')].spec.blocked}")
-
-	output, err := utils.Run(cmd)
-	if err != nil {
-		return err
-	}
-
-	actualBlocked := strings.TrimSpace(string(output)) == "true"
-	if actualBlocked != expectedBlocked {
-		return fmt.Errorf("expected blocked status %v, got %v", expectedBlocked, actualBlocked)
-	}
-
-	return nil
-}
-
-func verifyTeamBudgetDuration(teamAlias, expectedDuration string) error {
-	cmd := exec.Command("kubectl", "get", "team", "-n", modelTestNamespace,
-		"-o", "jsonpath={.items[?(@.spec.teamAlias=='"+teamAlias+"')].spec.budgetDuration}")
-
-	output, err := utils.Run(cmd)
-	if err != nil {
-		return err
-	}
-
-	if strings.TrimSpace(string(output)) != expectedDuration {
-		return fmt.Errorf("expected budget duration %s, got %s", expectedDuration, string(output))
-	}
-
-	return nil
-}
-
-func verifyTeamCRStatus(teamCRName string) error {
+func getTeamCR(teamCRName string) (*authv1alpha1.Team, error) {
 	teamCR := &authv1alpha1.Team{}
 	err := k8sClient.Get(context.Background(), types.NamespacedName{
 		Name:      teamCRName,
 		Namespace: modelTestNamespace,
 	}, teamCR)
 	if err != nil {
+		return nil, fmt.Errorf("failed to get team %s: %w", teamCRName, err)
+	}
+	return teamCR, nil
+}
+
+// ============================================================================
+// Verification Helpers - LiteLLM
+// ============================================================================
+
+func verifyTeamExistsInLiteLLM(teamCRName string) error {
+	teamCR, err := getTeamCR(teamCRName)
+	if err != nil {
+		return err
+	}
+
+	if teamCR.Status.TeamID == "" {
+		return fmt.Errorf("team %s has empty status.teamID", teamCRName)
+	}
+
+	return nil
+}
+
+func verifyTeamUpdatedInLiteLLM(teamCRName, expectedBudget string, expectedRPM int) error {
+	teamCR, err := getTeamCR(teamCRName)
+	if err != nil {
+		return err
+	}
+
+	// Verify budget
+	if err := compareBudgetStrings(expectedBudget, teamCR.Status.MaxBudget); err != nil {
+		return err
+	}
+
+	// Verify RPM limit
+	if teamCR.Status.RPMLimit != expectedRPM {
+		return fmt.Errorf("expected RPM limit %d, got %d", expectedRPM, teamCR.Status.RPMLimit)
+	}
+
+	return nil
+}
+
+func verifyTeamDeletedFromLiteLLM(teamCRName string) error {
+	teamCR := &authv1alpha1.Team{}
+	err := k8sClient.Get(context.Background(), types.NamespacedName{
+		Name:      teamCRName,
+		Namespace: modelTestNamespace,
+	}, teamCR)
+
+	if err != nil {
+		// If the CR is not found, that's acceptable - it means it was deleted
+		if errors.IsNotFound(err) {
+			return nil
+		}
 		return fmt.Errorf("failed to get team %s: %w", teamCRName, err)
+	}
+
+	if teamCR.GetDeletionTimestamp().IsZero() {
+		return fmt.Errorf("team %s is not marked for deletion", teamCRName)
+	}
+
+	return fmt.Errorf("team %s is not deleted", teamCRName)
+}
+
+func verifyTeamBudgetDuration(teamCRName, expectedDuration string) error {
+	teamCR, err := getTeamCR(teamCRName)
+	if err != nil {
+		return err
+	}
+
+	if teamCR.Status.BudgetDuration != expectedDuration {
+		return fmt.Errorf("expected budget duration %s, got %s", expectedDuration, teamCR.Status.BudgetDuration)
+	}
+
+	return nil
+}
+
+// ============================================================================
+// Verification Helpers - Status
+// ============================================================================
+
+func verifyTeamCRStatus(teamCRName string) error {
+	teamCR, err := getTeamCR(teamCRName)
+	if err != nil {
+		return err
 	}
 
 	return verifyReady(teamCR.GetConditions(), statusReady)

@@ -17,16 +17,23 @@ limitations under the License.
 package e2e
 
 import (
+	"context"
 	"fmt"
 	"os/exec"
+	"strconv"
 	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
+	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes/scheme"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
 
+	litellmv1alpha1 "github.com/bbdsoftware/litellm-operator/api/litellm/v1alpha1"
 	"github.com/bbdsoftware/litellm-operator/test/utils"
 )
 
@@ -40,7 +47,7 @@ var _ = BeforeSuite(func() {
 	var err error
 
 	// projectimage stores the name of the image used in the example
-	var projectimage = "example.com/litellm-operator:v0.0.1"
+	var projectimage = "litellm-operator:dev"
 
 	By("building the manager(Operator) image")
 	cmd = exec.Command("make", "docker-build", fmt.Sprintf("IMG=%s", projectimage))
@@ -57,7 +64,7 @@ var _ = BeforeSuite(func() {
 	ExpectWithOffset(1, err).NotTo(HaveOccurred())
 
 	By("deploying the controller-manager")
-	cmd = exec.Command("make", "deploy", fmt.Sprintf("IMG=%s", projectimage))
+	cmd = exec.Command("make", "deploy-controller-dev")
 	_, err = utils.Run(cmd)
 	ExpectWithOffset(1, err).NotTo(HaveOccurred())
 
@@ -119,6 +126,8 @@ var _ = AfterSuite(func() {
 	_, _ = utils.Run(cmd)
 	cmd = exec.Command("kubectl", "delete", "virtualkey", "-n", modelTestNamespace, "--all")
 	_, _ = utils.Run(cmd)
+	cmd = exec.Command("kubectl", "delete", "model", "-n", modelTestNamespace, "--all")
+	_, _ = utils.Run(cmd)
 	cmd = exec.Command("kubectl", "delete", "namespace", modelTestNamespace)
 	_, _ = utils.Run(cmd)
 
@@ -131,3 +140,162 @@ var _ = Describe("controller", Ordered, func() {
 	// Additional e2e test files are included automatically via init() functions
 	// in user_e2e_test.go, team_e2e_test.go, virtualkey_e2e_test.go, and integration_e2e_test.go
 })
+
+// ============================================================================
+// Setup Helpers
+// ============================================================================
+
+func waitForLiteLLMInstanceReady() error {
+	litellmInstance := &litellmv1alpha1.LiteLLMInstance{}
+	err := k8sClient.Get(context.Background(), types.NamespacedName{
+		Name:      "e2e-test-instance",
+		Namespace: modelTestNamespace,
+	}, litellmInstance)
+	if err != nil {
+		return err
+	}
+
+	return verifyReady(litellmInstance.Status.Conditions, statusReady)
+}
+
+func waitForPostgresInitComplete() error {
+	cmd := exec.Command("kubectl", "wait", "--for=condition=Complete", "job/litellm-postgres-1-initdb", "-n", modelTestNamespace, "--timeout=300s")
+	_, err := utils.Run(cmd)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func waitForPostgresPodReady() error {
+	cmd := exec.Command("kubectl", "wait", "--for=condition=Ready", "pod", "-l", "cnpg.io/instanceName=litellm-postgres-1", "-n", modelTestNamespace, "--timeout=300s")
+	_, err := utils.Run(cmd)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+// ============================================================================
+// Utility Helpers
+// ============================================================================
+
+// eventuallyVerify wraps the common Eventually pattern for verification functions
+func eventuallyVerify(verifyFn func() error) {
+	Eventually(verifyFn, testTimeout, testInterval).Should(Succeed())
+}
+
+// getSecret retrieves a secret by name
+func getSecret(secretName string) error {
+	secretCR := &corev1.Secret{}
+	err := k8sClient.Get(context.Background(), types.NamespacedName{
+		Name:      secretName,
+		Namespace: modelTestNamespace,
+	}, secretCR)
+	if err != nil {
+		// Don't wrap NotFound errors so they can be checked with errors.IsNotFound
+		if errors.IsNotFound(err) {
+			return err
+		}
+		return fmt.Errorf("failed to get secret %s: %w", secretName, err)
+	}
+	return nil
+}
+
+// verifySecretDeleted verifies that a secret has been deleted from Kubernetes
+func verifySecretDeleted(secretName string) error {
+	err := getSecret(secretName)
+
+	if err != nil {
+		if errors.IsNotFound(err) {
+			return nil
+		}
+		return err
+	}
+
+	return fmt.Errorf("secret %s still exists in Kubernetes", secretName)
+}
+
+// compareBudgetStrings compares two budget strings as floats to account for decimal formatting differences
+func compareBudgetStrings(expected, actual string) error {
+	expectedFloat, err := strconv.ParseFloat(expected, 64)
+	if err != nil {
+		return fmt.Errorf("failed to parse expected budget %s as float: %w", expected, err)
+	}
+	actualFloat, err := strconv.ParseFloat(actual, 64)
+	if err != nil {
+		return fmt.Errorf("failed to parse actual budget %s as float: %w", actual, err)
+	}
+	if actualFloat != expectedFloat {
+		return fmt.Errorf("expected budget %f, got %f", expectedFloat, actualFloat)
+	}
+	return nil
+}
+
+// parseDurationAndCalculateExpiry parses a duration string and calculates the expected expiry time
+func parseDurationAndCalculateExpiry(duration string) (time.Time, error) {
+	expectedDurationParsed, err := time.ParseDuration(duration)
+	if err != nil {
+		return time.Time{}, fmt.Errorf("failed to parse expected duration %s: %w", duration, err)
+	}
+	// calculate the expected expiry time (now + expected duration)
+	return time.Now().Add(expectedDurationParsed), nil
+}
+
+// findReadyCondition finds the Ready condition in the conditions slice
+func findReadyCondition(conditions []metav1.Condition) (*metav1.Condition, error) {
+	for i := range conditions {
+		if conditions[i].Type == "Ready" {
+			return &conditions[i], nil
+		}
+	}
+	return nil, fmt.Errorf("Ready condition not found")
+}
+
+// verifyConditionStatus verifies that the condition has the expected status
+func verifyConditionStatus(condition metav1.Condition, expectedStatus string) error {
+	got := string(condition.Status)
+	var expectedConditionStatus string
+	switch expectedStatus {
+	case statusReady:
+		expectedConditionStatus = condStatusTrue
+	case statusError:
+		expectedConditionStatus = condStatusFalse
+	default:
+		expectedConditionStatus = expectedStatus
+	}
+
+	if got != expectedConditionStatus {
+		return fmt.Errorf("expected status %s (condition status %s), got %s", expectedStatus, expectedConditionStatus, got)
+	}
+	return nil
+}
+
+// verifyReady verifies that the Ready condition has the expected status
+func verifyReady(conditions []metav1.Condition, expectedStatus string) error {
+	readyCondition, err := findReadyCondition(conditions)
+	if err != nil {
+		return err
+	}
+
+	return verifyConditionStatus(*readyCondition, expectedStatus)
+}
+
+// verifyReadyError verifies that the Ready condition has the expected status and the error message is as expected
+func verifyReadyError(conditions []metav1.Condition, expectedStatus string, errorMsg string) error {
+	condition, err := findReadyCondition(conditions)
+	if err != nil {
+		return err
+	}
+
+	err = verifyConditionStatus(*condition, expectedStatus)
+	if err != nil {
+		return err
+	}
+
+	if condition.Message != errorMsg {
+		return fmt.Errorf("expected error message '%s', got '%s'", errorMsg, condition.Message)
+	}
+
+	return nil
+}
