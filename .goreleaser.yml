@@ -115,7 +115,7 @@ changelog:
     exclude:
       - "^docs:"
       - "^test:"
-      - "^chore(\([[:word:]]+\))?:"
+      - '^chore(\([[:word:]]+\))?:'
       - "^ci:"
       - "^Automated update to"
       - "^Merge pull request #"
