@@ -14,7 +14,7 @@ type LitellmVirtualKey interface {
 	DeleteVirtualKey(ctx context.Context, keyAlias string) error
 	GenerateVirtualKey(ctx context.Context, req *VirtualKeyRequest) (VirtualKeyResponse, error)
 	GetVirtualKeyFromAlias(ctx context.Context, keyAlias string) ([]string, error)
-	GetVirtualKeyInfo(ctx context.Context, key string) (VirtualKeyResponse, error)
+	GetVirtualKeyInfo(ctx context.Context, keyID string) (VirtualKeyResponse, error)
 	IsVirtualKeyUpdateNeeded(ctx context.Context, virtualKey *VirtualKeyResponse, req *VirtualKeyRequest) bool
 	UpdateVirtualKey(ctx context.Context, req *VirtualKeyRequest) (VirtualKeyResponse, error)
 	SetVirtualKeyBlockedState(ctx context.Context, key string, blocked bool) error
@@ -176,11 +176,11 @@ func (l *LitellmClient) GetVirtualKeyFromAlias(ctx context.Context, keyAlias str
 	return response.Keys, nil
 }
 
-// GetVirtualKey gets a virtual key from the Litellm service
-func (l *LitellmClient) GetVirtualKeyInfo(ctx context.Context, key string) (VirtualKeyResponse, error) {
+// GetVirtualKeyInfo gets a virtual key from the Litellm service by key/token ID
+func (l *LitellmClient) GetVirtualKeyInfo(ctx context.Context, keyID string) (VirtualKeyResponse, error) {
 	log := log.FromContext(ctx)
 
-	body, err := l.makeRequest(ctx, "GET", "/key/info?key="+key, nil)
+	body, err := l.makeRequest(ctx, "GET", "/key/info?key="+keyID, nil)
 	if err != nil {
 		log.Error(err, "Failed to get virtual key")
 		return VirtualKeyResponse{}, err
