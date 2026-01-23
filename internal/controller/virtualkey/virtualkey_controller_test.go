@@ -158,6 +158,10 @@ func (m *mockLitellmVirtualKeyClient) UpdateVirtualKey(ctx context.Context, req 
 	return litellm.VirtualKeyResponse{}, fmt.Errorf("virtual key not found")
 }
 
+func (m *mockLitellmVirtualKeyClient) SetVirtualKeyBlockedState(ctx context.Context, key string, blocked bool) error {
+	return nil
+}
+
 // Helper functions for testing
 func setupTestVirtualKeyReconciler(objects ...client.Object) *VirtualKeyReconciler {
 	scheme := runtime.NewScheme()
