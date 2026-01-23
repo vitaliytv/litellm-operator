@@ -267,12 +267,12 @@ func createIntegrationTeamCR(name, teamAlias string) *authv1alpha1.Team {
 	return &authv1alpha1.Team{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
-			Namespace: modelTestNamespace,
+			Namespace: e2eTestNamespace,
 		},
 		Spec: authv1alpha1.TeamSpec{
 			ConnectionRef: authv1alpha1.ConnectionRef{
 				InstanceRef: &authv1alpha1.InstanceRef{
-					Namespace: modelTestNamespace,
+					Namespace: e2eTestNamespace,
 					Name:      "e2e-test-instance",
 				},
 			},
@@ -287,12 +287,12 @@ func createIntegrationUserCR(name, userEmail string) *authv1alpha1.User {
 	return &authv1alpha1.User{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
-			Namespace: modelTestNamespace,
+			Namespace: e2eTestNamespace,
 		},
 		Spec: authv1alpha1.UserSpec{
 			ConnectionRef: authv1alpha1.ConnectionRef{
 				InstanceRef: &authv1alpha1.InstanceRef{
-					Namespace: modelTestNamespace,
+					Namespace: e2eTestNamespace,
 					Name:      "e2e-test-instance",
 				},
 			},
@@ -307,12 +307,12 @@ func createIntegrationVirtualKeyCR(name, keyAlias, userEmail string) *authv1alph
 	return &authv1alpha1.VirtualKey{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
-			Namespace: modelTestNamespace,
+			Namespace: e2eTestNamespace,
 		},
 		Spec: authv1alpha1.VirtualKeySpec{
 			ConnectionRef: authv1alpha1.ConnectionRef{
 				InstanceRef: &authv1alpha1.InstanceRef{
-					Namespace: modelTestNamespace,
+					Namespace: e2eTestNamespace,
 					Name:      "e2e-test-instance",
 				},
 			},
@@ -330,22 +330,22 @@ func createTeamMemberAssociationCR(name, teamCRName, userCRName string) *authv1a
 	return &authv1alpha1.TeamMemberAssociation{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
-			Namespace: modelTestNamespace,
+			Namespace: e2eTestNamespace,
 		},
 		Spec: authv1alpha1.TeamMemberAssociationSpec{
 			ConnectionRef: authv1alpha1.ConnectionRef{
 				InstanceRef: &authv1alpha1.InstanceRef{
-					Namespace: modelTestNamespace,
+					Namespace: e2eTestNamespace,
 					Name:      "e2e-test-instance",
 				},
 			},
 			TeamRef: authv1alpha1.CRDRef{
 				Name:      teamCRName,
-				Namespace: modelTestNamespace,
+				Namespace: e2eTestNamespace,
 			},
 			UserRef: authv1alpha1.CRDRef{
 				Name:      userCRName,
-				Namespace: modelTestNamespace,
+				Namespace: e2eTestNamespace,
 			},
 			Role: "user",
 		},
@@ -390,7 +390,7 @@ func getTeamMemberAssociationCR(associationCRName string) (*authv1alpha1.TeamMem
 	association := &authv1alpha1.TeamMemberAssociation{}
 	err := k8sClient.Get(context.Background(), types.NamespacedName{
 		Name:      associationCRName,
-		Namespace: modelTestNamespace,
+		Namespace: e2eTestNamespace,
 	}, association)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get team member association %s: %w", associationCRName, err)
@@ -431,7 +431,7 @@ func verifyTeamMemberAssociationCRStatus(associationCRName, expectedStatus strin
 	association := &authv1alpha1.TeamMemberAssociation{}
 	err := k8sClient.Get(context.Background(), types.NamespacedName{
 		Name:      associationCRName,
-		Namespace: modelTestNamespace,
+		Namespace: e2eTestNamespace,
 	}, association)
 	if err != nil {
 		return fmt.Errorf("failed to get team member association %s: %w", associationCRName, err)
@@ -444,7 +444,7 @@ func verifyTeamMemberAssociationDeletedFromLiteLLM(associationCRName string) err
 	association := &authv1alpha1.TeamMemberAssociation{}
 	err := k8sClient.Get(context.Background(), types.NamespacedName{
 		Name:      associationCRName,
-		Namespace: modelTestNamespace,
+		Namespace: e2eTestNamespace,
 	}, association)
 
 	if err == nil {

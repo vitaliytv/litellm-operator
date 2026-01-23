@@ -83,7 +83,7 @@ ginkgo -v test/e2e/
 
 ### Test Namespace
 
-All tests run in the `model-e2e-test` namespace, which is created and destroyed automatically.
+All tests run in the `e2e-test` namespace, which is created and destroyed automatically.
 
 ### Sample Resources
 
@@ -136,23 +136,23 @@ Each test ensures proper cleanup of resources:
 kubectl logs -n litellm-operator-system deployment/litellm-operator-controller-manager
 
 # Get specific resource status
-kubectl get users,teams,virtualkeys,teammemberassociations -n model-e2e-test -o wide
+kubectl get users,teams,virtualkeys,teammemberassociations -n e2e-test -o wide
 
 # Describe specific resource for events
-kubectl describe user <user-name> -n model-e2e-test
+kubectl describe user <user-name> -n e2e-test
 ```
 
 ### Manual Resource Inspection
 
 ```bash
 # Check LiteLLM instance status
-kubectl get litellminstance -n model-e2e-test -o yaml
+kubectl get litellminstance -n e2e-test -o yaml
 
 # Verify PostgreSQL is running
-kubectl get cluster,pods -n model-e2e-test
+kubectl get cluster,pods -n e2e-test
 
 # Check secrets
-kubectl get secrets -n model-e2e-test
+kubectl get secrets -n e2e-test
 ```
 
 ### Common Issues

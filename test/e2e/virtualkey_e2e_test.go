@@ -143,6 +143,45 @@ var _ = Describe("VirtualKey E2E Tests", Ordered, func() {
 			Expect(deleteVirtualKeyCR(keyCRName)).To(Succeed())
 		})
 
+		It("should handle blocking and unblocking a virtual key", func() {
+			keyAlias := "blocked-key"
+			keyCRName := "blocked-key-cr"
+
+			By("creating a virtual key CR")
+			keyCR := createVirtualKeyCR(keyCRName, keyAlias)
+			Expect(k8sClient.Create(context.Background(), keyCR)).To(Succeed())
+
+			By("verifying virtual key CR has ready status")
+			eventuallyVerify(func() error {
+				return verifyVirtualKeyCRStatus(keyCRName, "Ready")
+			})
+
+			By("blocking the virtual key")
+			updatedKeyCR, err := getVirtualKeyCR(keyCRName)
+			Expect(err).NotTo(HaveOccurred())
+			updatedKeyCR.Spec.Blocked = true
+			Expect(k8sClient.Update(context.Background(), updatedKeyCR)).To(Succeed())
+
+			By("verifying the virtual key is blocked")
+			eventuallyVerify(func() error {
+				return verifyVirtualKeyBlockedStatus(keyCRName, true)
+			})
+
+			By("unblocking the virtual key")
+			updatedKeyCR, err = getVirtualKeyCR(keyCRName)
+			Expect(err).NotTo(HaveOccurred())
+			updatedKeyCR.Spec.Blocked = false
+			Expect(k8sClient.Update(context.Background(), updatedKeyCR)).To(Succeed())
+
+			By("verifying the virtual key is unblocked")
+			eventuallyVerify(func() error {
+				return verifyVirtualKeyBlockedStatus(keyCRName, false)
+			})
+
+			By("cleaning up virtual key CR")
+			Expect(deleteVirtualKeyCR(keyCRName)).To(Succeed())
+		})
+
 		// TODO: blocking/unblocking virtual keys uses /key/block and /key/unblock endpoints, which are not yet implemented.
 		// 	It("should handle virtual key with blocked status", func() {
 		// 		keyAlias := "blocked-key"
@@ -235,12 +274,12 @@ func createVirtualKeyCR(name, keyAlias string) *authv1alpha1.VirtualKey {
 	return &authv1alpha1.VirtualKey{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
-			Namespace: modelTestNamespace,
+			Namespace: e2eTestNamespace,
 		},
 		Spec: authv1alpha1.VirtualKeySpec{
 			ConnectionRef: authv1alpha1.ConnectionRef{
 				InstanceRef: &authv1alpha1.InstanceRef{
-					Namespace: modelTestNamespace,
+					Namespace: e2eTestNamespace,
 					Name:      "e2e-test-instance",
 				},
 			},
@@ -280,7 +319,7 @@ func getVirtualKeyCR(keyCRName string) (*authv1alpha1.VirtualKey, error) {
 	virtualKeyCR := &authv1alpha1.VirtualKey{}
 	err := k8sClient.Get(context.Background(), types.NamespacedName{
 		Name:      keyCRName,
-		Namespace: modelTestNamespace,
+		Namespace: e2eTestNamespace,
 	}, virtualKeyCR)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get virtual key %s: %w", keyCRName, err)
@@ -328,7 +367,7 @@ func verifyVirtualKeyDeletedFromLiteLLM(keyCRName string) error {
 	virtualKeyCR := &authv1alpha1.VirtualKey{}
 	err := k8sClient.Get(context.Background(), types.NamespacedName{
 		Name:      keyCRName,
-		Namespace: modelTestNamespace,
+		Namespace: e2eTestNamespace,
 	}, virtualKeyCR)
 
 	if err != nil {
@@ -419,6 +458,17 @@ func verifyVirtualKeyExpiry(keyCRName, duration string, expectedExpires time.Tim
 			expires, duration, expectedExpires, expires, diff, tolerance)
 	}
 
+	return nil
+}
+
+func verifyVirtualKeyBlockedStatus(keyCRName string, expectedBlocked bool) error {
+	virtualKeyCR, err := getVirtualKeyCR(keyCRName)
+	if err != nil {
+		return err
+	}
+	if virtualKeyCR.Status.Blocked != expectedBlocked {
+		return fmt.Errorf("expected blocked status %t, got %t", expectedBlocked, virtualKeyCR.Status.Blocked)
+	}
 	return nil
 }
 

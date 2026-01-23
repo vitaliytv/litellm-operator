@@ -72,7 +72,7 @@ var _ = Describe("Team E2E Tests", Ordered, func() {
 			updatedTeamCR := &authv1alpha1.Team{}
 			Expect(k8sClient.Get(context.Background(), types.NamespacedName{
 				Name:      teamCRName,
-				Namespace: modelTestNamespace,
+				Namespace: e2eTestNamespace,
 			}, updatedTeamCR)).To(Succeed())
 
 			// Update team properties
@@ -191,7 +191,7 @@ var _ = Describe("Team E2E Tests", Ordered, func() {
 			updatedTeamCR := &authv1alpha1.Team{}
 			Expect(k8sClient.Get(context.Background(), types.NamespacedName{
 				Name:      teamCRName,
-				Namespace: modelTestNamespace,
+				Namespace: e2eTestNamespace,
 			}, updatedTeamCR)).To(Succeed())
 
 			updatedTeamCR.Spec.TeamAlias = "new-team-alias"
@@ -203,7 +203,7 @@ var _ = Describe("Team E2E Tests", Ordered, func() {
 			originalTeamCR := &authv1alpha1.Team{}
 			Expect(k8sClient.Get(context.Background(), types.NamespacedName{
 				Name:      teamCRName,
-				Namespace: modelTestNamespace,
+				Namespace: e2eTestNamespace,
 			}, originalTeamCR)).To(Succeed())
 			Expect(k8sClient.Delete(context.Background(), originalTeamCR)).To(Succeed())
 		})
@@ -237,12 +237,12 @@ func createTeamCR(name, teamAlias string) *authv1alpha1.Team {
 	return &authv1alpha1.Team{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
-			Namespace: modelTestNamespace,
+			Namespace: e2eTestNamespace,
 		},
 		Spec: authv1alpha1.TeamSpec{
 			ConnectionRef: authv1alpha1.ConnectionRef{
 				InstanceRef: &authv1alpha1.InstanceRef{
-					Namespace: modelTestNamespace,
+					Namespace: e2eTestNamespace,
 					Name:      "e2e-test-instance",
 				},
 			},
@@ -270,7 +270,7 @@ func getTeamCR(teamCRName string) (*authv1alpha1.Team, error) {
 	teamCR := &authv1alpha1.Team{}
 	err := k8sClient.Get(context.Background(), types.NamespacedName{
 		Name:      teamCRName,
-		Namespace: modelTestNamespace,
+		Namespace: e2eTestNamespace,
 	}, teamCR)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get team %s: %w", teamCRName, err)
@@ -318,7 +318,7 @@ func verifyTeamDeletedFromLiteLLM(teamCRName string) error {
 	teamCR := &authv1alpha1.Team{}
 	err := k8sClient.Get(context.Background(), types.NamespacedName{
 		Name:      teamCRName,
-		Namespace: modelTestNamespace,
+		Namespace: e2eTestNamespace,
 	}, teamCR)
 
 	if err != nil {
