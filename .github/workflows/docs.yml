@@ -210,7 +210,7 @@ jobs:
           
           echo "✅ Pre-release documentation deployed successfully"
 
-  build-test:
+  documentation-build-test:
     runs-on: ubuntu-latest
     if: github.event_name == 'pull_request'
     

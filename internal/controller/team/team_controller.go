@@ -245,6 +245,16 @@ func (r *TeamReconciler) ensureExternal(ctx context.Context, team *authv1alpha1.
 	updateNeeded := r.LitellmClient.IsTeamUpdateNeeded(ctx, &observedTeam, &teamRequest)
 	if updateNeeded {
 		log.Info("Repairing drift in LiteLLM", "teamAlias", team.Spec.TeamAlias)
+
+		// handle block/unblock first
+		if teamRequest.Blocked != observedTeam.Blocked {
+			err := r.LitellmClient.SetTeamBlockedState(ctx, team.Status.TeamID, teamRequest.Blocked)
+			if err != nil {
+				log.Error(err, "Failed to set team blocked state in LiteLLM")
+				return r.HandleErrorRetryable(ctx, team, err, base.ReasonLitellmError)
+			}
+		}
+
 		updateResponse, err := r.LitellmClient.UpdateTeam(ctx, &teamRequest)
 		if err != nil {
 			log.Error(err, "Failed to update team in LiteLLM")

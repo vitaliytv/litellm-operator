@@ -96,38 +96,44 @@ var _ = Describe("Team E2E Tests", Ordered, func() {
 			})
 		})
 
-		// TODO: blocking/unblocking teams uses /team/block and /team/unblock endpoints, which are not yet implemented.
-		// It("should handle team with blocked status", func() {
-		// 	teamAlias := "blocked-team"
-		// 	teamCRName := "blocked-team-cr"
+		It("should handle blocking and unblocking a team", func() {
+			teamAlias := "blocked-team"
+			teamCRName := "blocked-team-cr"
 
-		// 	By("creating a team CR with blocked status")
-		// 	teamCR := createBlockedTeamCR(teamCRName, teamAlias)
-		// 	Expect(k8sClient.Create(context.Background(), teamCR)).To(Succeed())
+			By("creating a team CR")
+			teamCR := createTeamCR(teamCRName, teamAlias)
+			Expect(k8sClient.Create(context.Background(), teamCR)).To(Succeed())
 
-		// 	By("verifying the team was created with blocked status")
-		// 	Eventually(func() error {
-		// 		return verifyTeamBlockedStatus(teamCRName, true)
-		// 	}, testTimeout, testInterval).Should(Succeed())
+			By("verifying team CR has ready status")
+			eventuallyVerify(func() error {
+				return verifyTeamCRStatus(teamCRName)
+			})
 
-		// 	By("unblocking the team")
-		// 	updatedTeamCR := &authv1alpha1.Team{}
-		// 	Expect(k8sClient.Get(context.Background(), types.NamespacedName{
-		// 		Name:      teamCRName,
-		// 		Namespace: modelTestNamespace,
-		// 	}, updatedTeamCR)).To(Succeed())
+			By("blocking the team")
+			updatedTeamCR, err := getTeamCR(teamCRName)
+			Expect(err).NotTo(HaveOccurred())
+			updatedTeamCR.Spec.Blocked = true
+			Expect(k8sClient.Update(context.Background(), updatedTeamCR)).To(Succeed())
 
-		// 	updatedTeamCR.Spec.Blocked = false
-		// 	Expect(k8sClient.Update(context.Background(), updatedTeamCR)).To(Succeed())
+			By("verifying the team is blocked")
+			eventuallyVerify(func() error {
+				return verifyTeamBlockedStatus(teamCRName, true)
+			})
 
-		// 	By("verifying the team is no longer blocked")
-		// 	Eventually(func() error {
-		// 		return verifyTeamBlockedStatus(teamCRName, false)
-		// 	}, testTimeout, testInterval).Should(Succeed())
+			By("unblocking the team")
+			updatedTeamCR, err = getTeamCR(teamCRName)
+			Expect(err).NotTo(HaveOccurred())
+			updatedTeamCR.Spec.Blocked = false
+			Expect(k8sClient.Update(context.Background(), updatedTeamCR)).To(Succeed())
 
-		// 	By("cleaning up team CR")
-		// 	Expect(k8sClient.Delete(context.Background(), updatedTeamCR)).To(Succeed())
-		// })
+			By("verifying the team is unblocked")
+			eventuallyVerify(func() error {
+				return verifyTeamBlockedStatus(teamCRName, false)
+			})
+
+			By("cleaning up team CR")
+			Expect(deleteTeamCR(teamCRName)).To(Succeed())
+		})
 
 		It("should handle multiple teams in the same namespace", func() {
 			team1Alias := "multi-test-team-1"
@@ -160,8 +166,8 @@ var _ = Describe("Team E2E Tests", Ordered, func() {
 			})
 
 			By("cleaning up both team CRs")
-			Expect(k8sClient.Delete(context.Background(), team1CR)).To(Succeed())
-			Expect(k8sClient.Delete(context.Background(), team2CR)).To(Succeed())
+			Expect(deleteTeamCR(team1CRName)).To(Succeed())
+			Expect(deleteTeamCR(team2CRName)).To(Succeed())
 
 			By("verifying both teams were deleted from LiteLLM")
 			eventuallyVerify(func() error {
@@ -200,12 +206,7 @@ var _ = Describe("Team E2E Tests", Ordered, func() {
 			Expect(err.Error()).To(ContainSubstring("TeamAlias is immutable"))
 
 			By("cleaning up team CR")
-			originalTeamCR := &authv1alpha1.Team{}
-			Expect(k8sClient.Get(context.Background(), types.NamespacedName{
-				Name:      teamCRName,
-				Namespace: e2eTestNamespace,
-			}, originalTeamCR)).To(Succeed())
-			Expect(k8sClient.Delete(context.Background(), originalTeamCR)).To(Succeed())
+			Expect(deleteTeamCR(teamCRName)).To(Succeed())
 		})
 
 		It("should handle team with budget duration", func() {
@@ -224,7 +225,7 @@ var _ = Describe("Team E2E Tests", Ordered, func() {
 			})
 
 			By("cleaning up team CR")
-			Expect(k8sClient.Delete(context.Background(), teamCR)).To(Succeed())
+			Expect(deleteTeamCR(teamCRName)).To(Succeed())
 		})
 	})
 })
@@ -360,4 +361,27 @@ func verifyTeamCRStatus(teamCRName string) error {
 	}
 
 	return verifyReady(teamCR.GetConditions(), statusReady)
+}
+
+func verifyTeamBlockedStatus(teamCRName string, expectedBlocked bool) error {
+	teamCR, err := getTeamCR(teamCRName)
+	if err != nil {
+		return err
+	}
+	if teamCR.Status.Blocked != expectedBlocked {
+		return fmt.Errorf("expected blocked status %t, got %t", expectedBlocked, teamCR.Status.Blocked)
+	}
+	return nil
+}
+
+// ============================================================================
+// Utility Helpers
+// ============================================================================
+
+func deleteTeamCR(teamCRName string) error {
+	teamCR, err := getTeamCR(teamCRName)
+	if err != nil {
+		return err
+	}
+	return k8sClient.Delete(context.Background(), teamCR)
 }

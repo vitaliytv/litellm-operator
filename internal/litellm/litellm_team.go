@@ -3,6 +3,7 @@ package litellm
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
@@ -16,6 +17,7 @@ type LitellmTeam interface {
 	GetTeamID(ctx context.Context, teamAlias string) (string, error)
 	IsTeamUpdateNeeded(ctx context.Context, team *TeamResponse, req *TeamRequest) bool
 	UpdateTeam(ctx context.Context, req *TeamRequest) (TeamResponse, error)
+	SetTeamBlockedState(ctx context.Context, teamID string, blocked bool) error
 }
 
 type TeamMemberWithRole struct {
@@ -184,6 +186,40 @@ func (l *LitellmClient) GetTeam(ctx context.Context, teamID string) (TeamRespons
 	}
 
 	return response.Team, nil
+}
+
+// SetTeamBlockedState sets the blocked state on the provided team
+func (l *LitellmClient) SetTeamBlockedState(ctx context.Context, teamID string, blocked bool) error {
+	log := log.FromContext(ctx)
+
+	formData, err := json.Marshal(map[string]string{"team_id": teamID})
+	if err != nil {
+		log.Error(err, "Failed to marshal manage team blocked state request payload")
+		return err
+	}
+
+	path := "/team/block"
+	if !blocked {
+		path = "/team/unblock"
+	}
+
+	body, err := l.makeRequest(ctx, "POST", path, formData)
+	if err != nil {
+		log.Error(err, "Failed to update team blocked state in Litellm")
+		return err
+	}
+
+	var response TeamResponse
+	if err := json.Unmarshal(body, &response); err != nil {
+		log.Error(err, "Failed to unmarshal team response from Litellm")
+		return err
+	}
+
+	if response.Blocked != blocked {
+		return fmt.Errorf("failed to update team blocked state: expected %t, got %t", blocked, response.Blocked)
+	}
+
+	return nil
 }
 
 // IsTeamUpdateNeeded checks if a team needs to be updated in the Litellm service
