@@ -161,10 +161,7 @@ release:
     
     #### Using Helm (Recommended)
     
-    ```bash
-    # Authenticate with GitHub Container Registry
-    helm registry login ghcr.io -u YOUR_GITHUB_USERNAME -p YOUR_GITHUB_TOKEN
-    
+    ```bash    
     # Install the pre-release operator from OCI registry
     helm install litellm-operator oci://ghcr.io/{{ .Env.GITHUB_REPOSITORY_OWNER }}/charts/{{ .ProjectName }} --version {{ .Version }}
     ```
