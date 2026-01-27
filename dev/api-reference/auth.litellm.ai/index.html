@@ -1041,6 +1041,17 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
+  <a href="#crdref" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        CRDRef
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#connectionref" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1504,6 +1515,17 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
+  <a href="#crdref" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        CRDRef
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#connectionref" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1782,6 +1804,33 @@
 <li><a href="#virtualkey">VirtualKey</a></li>
 <li><a href="#virtualkeylist">VirtualKeyList</a></li>
 </ul>
+<h4 id="crdref">CRDRef<a class="headerlink" href="#crdref" title="Permanent link">&para;</a></h4>
+<p><em>Appears in:</em>
+- <a href="#teammemberassociationspec">TeamMemberAssociationSpec</a></p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+<th>Default</th>
+<th>Validation</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>name</code> <em>string</em></td>
+<td></td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td><code>namespace</code> <em>string</em></td>
+<td></td>
+<td></td>
+<td></td>
+</tr>
+</tbody>
+</table>
 <h4 id="connectionref">ConnectionRef<a class="headerlink" href="#connectionref" title="Permanent link">&para;</a></h4>
 <p>ConnectionRef defines how to connect to a LiteLLM instance</p>
 <p><em>Appears in:</em>
@@ -2140,22 +2189,22 @@
 <td></td>
 </tr>
 <tr>
-<td><code>teamAlias</code> <em>string</em></td>
-<td>TeamID is the ID of the team</td>
-<td></td>
-<td>Required: {} <br /></td>
-</tr>
-<tr>
-<td><code>userEmail</code> <em>string</em></td>
-<td>UserEmail is the email of the user</td>
-<td></td>
-<td>Required: {} <br /></td>
-</tr>
-<tr>
 <td><code>role</code> <em>string</em></td>
 <td>Role is the role of the user - one of "admin" or "user"</td>
 <td></td>
 <td>Enum: [admin user] <br />Required: {} <br /></td>
+</tr>
+<tr>
+<td><code>teamRef</code> <em><a href="#crdref">CRDRef</a></em></td>
+<td>TeamRef is a reference to the team</td>
+<td></td>
+<td>Required: {} <br /></td>
+</tr>
+<tr>
+<td><code>userRef</code> <em><a href="#crdref">CRDRef</a></em></td>
+<td>UserRef is a reference to the user</td>
+<td></td>
+<td>Required: {} <br /></td>
 </tr>
 </tbody>
 </table>
@@ -2194,6 +2243,24 @@
 <tr>
 <td><code>userID</code> <em>string</em></td>
 <td>UserID is the ID of the user</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td><code>teamExists</code> <em>boolean</em></td>
+<td></td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td><code>userExists</code> <em>boolean</em></td>
+<td></td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td><code>associationIsValid</code> <em>boolean</em></td>
+<td></td>
 <td></td>
 <td></td>
 </tr>
@@ -2358,6 +2425,12 @@
 </tr>
 </thead>
 <tbody>
+<tr>
+<td><code>observedGeneration</code> <em>integer</em></td>
+<td>ObservedGeneration is the most recent generation observed for this Team. It corresponds to the<br />Team's generation, which is updated on mutation by the API Server.</td>
+<td></td>
+<td></td>
+</tr>
 <tr>
 <td><code>blocked</code> <em>boolean</em></td>
 <td>Blocked is a flag indicating if the team is blocked or not</td>
@@ -2768,7 +2841,7 @@
 <td><code>userRole</code> <em>string</em></td>
 <td>UserRole is the role of the user - one of "proxy_admin", "proxy_admin_viewer", "internal_user", "internal_user_viewer"</td>
 <td></td>
-<td></td>
+<td>Enum: [proxy_admin proxy_admin_viewer internal_user internal_user_viewer] <br /></td>
 </tr>
 </tbody>
 </table>
@@ -2999,6 +3072,12 @@
 <tr>
 <td><code>userRole</code> <em>string</em></td>
 <td>UserRole is the role of the user</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td><code>observedGeneration</code> <em>integer</em></td>
+<td>ObservedGeneration represents the .metadata.generation that the condition was set based upon</td>
 <td></td>
 <td></td>
 </tr>
@@ -3517,6 +3596,12 @@
 <tr>
 <td><code>userID</code> <em>string</em></td>
 <td>UserID identifies the user associated with the key</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td><code>observedGeneration</code> <em>integer</em></td>
+<td>ObservedGeneration tracks the generation observed by the controller</td>
 <td></td>
 <td></td>
 </tr>
