@@ -20,6 +20,23 @@ Package v1alpha1 contains API Schema definitions for the auth v1alpha1 API group
 
 
 
+#### CRDRef
+
+
+
+
+
+
+
+_Appears in:_
+- [TeamMemberAssociationSpec](#teammemberassociationspec)
+
+| Field | Description | Default | Validation |
+| --- | --- | --- | --- |
+| `name` _string_ |  |  |  |
+| `namespace` _string_ |  |  |  |
+
+
 #### ConnectionRef
 
 
@@ -190,9 +207,9 @@ _Appears in:_
 | --- | --- | --- | --- |
 | `connectionRef` _[ConnectionRef](#connectionref)_ | ConnectionRef defines how to connect to the LiteLLM instance |  | Required: \{\} <br /> |
 | `maxBudgetInTeam` _string_ | MaxBudgetInTeam is the maximum budget for the user in the team |  |  |
-| `teamAlias` _string_ | TeamID is the ID of the team |  | Required: \{\} <br /> |
-| `userEmail` _string_ | UserEmail is the email of the user |  | Required: \{\} <br /> |
 | `role` _string_ | Role is the role of the user - one of "admin" or "user" |  | Enum: [admin user] <br />Required: \{\} <br /> |
+| `teamRef` _[CRDRef](#crdref)_ | TeamRef is a reference to the team |  | Required: \{\} <br /> |
+| `userRef` _[CRDRef](#crdref)_ | UserRef is a reference to the user |  | Required: \{\} <br /> |
 
 
 #### TeamMemberAssociationStatus
@@ -212,6 +229,9 @@ _Appears in:_
 | `teamID` _string_ | TeamID is the ID of the team |  |  |
 | `userEmail` _string_ | UserEmail is the email of the user |  |  |
 | `userID` _string_ | UserID is the ID of the user |  |  |
+| `teamExists` _boolean_ |  |  |  |
+| `userExists` _boolean_ |  |  |  |
+| `associationIsValid` _boolean_ |  |  |  |
 | `conditions` _[Condition](https://kubernetes.io/docs/reference/generated/kubernetes-api/v/#condition-v1-meta) array_ |  |  |  |
 
 
@@ -276,6 +296,7 @@ _Appears in:_
 
 | Field | Description | Default | Validation |
 | --- | --- | --- | --- |
+| `observedGeneration` _integer_ | ObservedGeneration is the most recent generation observed for this Team. It corresponds to the<br />Team's generation, which is updated on mutation by the API Server. |  |  |
 | `blocked` _boolean_ | Blocked is a flag indicating if the team is blocked or not |  |  |
 | `budgetDuration` _string_ | BudgetDuration - Budget is reset at the end of specified duration. If not set, budget is never reset. |  |  |
 | `budgetResetAt` _string_ | BudgetResetAt is the date and time when the budget will be reset |  |  |
@@ -380,7 +401,7 @@ _Appears in:_
 | `userAlias` _string_ | UserAlias is the alias of the user |  |  |
 | `userEmail` _string_ | UserEmail is the email of the user |  | Required: \{\} <br /> |
 | `userID` _string_ | UserID is the ID of the user. If not set, a unique ID will be generated. |  |  |
-| `userRole` _string_ | UserRole is the role of the user - one of "proxy_admin", "proxy_admin_viewer", "internal_user", "internal_user_viewer" |  |  |
+| `userRole` _string_ | UserRole is the role of the user - one of "proxy_admin", "proxy_admin_viewer", "internal_user", "internal_user_viewer" |  | Enum: [proxy_admin proxy_admin_viewer internal_user internal_user_viewer] <br /> |
 
 
 #### UserStatus
@@ -432,6 +453,7 @@ _Appears in:_
 | `userEmail` _string_ | UserEmail is the email of the user |  |  |
 | `userID` _string_ | UserID is the unique user id |  |  |
 | `userRole` _string_ | UserRole is the role of the user |  |  |
+| `observedGeneration` _integer_ | ObservedGeneration represents the .metadata.generation that the condition was set based upon |  |  |
 | `conditions` _[Condition](https://kubernetes.io/docs/reference/generated/kubernetes-api/v/#condition-v1-meta) array_ |  |  |  |
 
 
@@ -567,6 +589,7 @@ _Appears in:_
 | `updatedAt` _string_ | UpdatedAt is the date and time when the key was last updated |  |  |
 | `updatedBy` _string_ | UpdatedBy tracks who last updated the key |  |  |
 | `userID` _string_ | UserID identifies the user associated with the key |  |  |
+| `observedGeneration` _integer_ | ObservedGeneration tracks the generation observed by the controller |  |  |
 | `conditions` _[Condition](https://kubernetes.io/docs/reference/generated/kubernetes-api/v/#condition-v1-meta) array_ |  |  |  |
 
 
