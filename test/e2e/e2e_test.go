@@ -37,7 +37,22 @@ import (
 	"github.com/bbdsoftware/litellm-operator/test/utils"
 )
 
-const namespace = "litellm-operator-system"
+const (
+	e2eTestNamespace = "e2e-test"
+	namespace        = "litellm-operator-system"
+	testTimeout      = 1 * time.Minute
+	testInterval     = 5 * time.Second
+)
+
+// Common string constants used when comparing condition statuses in kubectl jsonpath output
+const (
+	condStatusTrue  = "True"
+	condStatusFalse = "False"
+	statusReady     = "Ready"
+	statusError     = "Error"
+)
+
+var k8sClient client.Client
 
 var _ = BeforeSuite(func() {
 	By("creating manager namespace")
@@ -88,7 +103,7 @@ func setupLiteLLMInstanceForE2E() {
 	ExpectWithOffset(1, err).NotTo(HaveOccurred())
 
 	By("creating test namespace")
-	cmd := exec.Command("kubectl", "create", "namespace", modelTestNamespace)
+	cmd := exec.Command("kubectl", "create", "namespace", e2eTestNamespace)
 	_, _ = utils.Run(cmd)
 
 	By("Starting Postgres instance")
@@ -109,7 +124,7 @@ func setupLiteLLMInstanceForE2E() {
 	By("waiting for LiteLLM instance to be ready")
 	EventuallyWithOffset(1, func() error {
 		return waitForLiteLLMInstanceReady()
-	}, testTimeout, testInterval).Should(Succeed())
+	}, 3*time.Minute, testInterval).Should(Succeed())
 }
 
 var _ = AfterSuite(func() {
@@ -118,17 +133,17 @@ var _ = AfterSuite(func() {
 	time.Sleep(2 * time.Second)
 	// Deleting the namespace will hang if we don't delete the resources first
 	// this can happen if a test fails, which prevents the cleanup from happening
-	cmd := exec.Command("kubectl", "delete", "teammemberassociation", "-n", modelTestNamespace, "--all")
+	cmd := exec.Command("kubectl", "delete", "teammemberassociation", "-n", e2eTestNamespace, "--all")
 	_, _ = utils.Run(cmd)
-	cmd = exec.Command("kubectl", "delete", "team", "-n", modelTestNamespace, "--all")
+	cmd = exec.Command("kubectl", "delete", "team", "-n", e2eTestNamespace, "--all")
 	_, _ = utils.Run(cmd)
-	cmd = exec.Command("kubectl", "delete", "user", "-n", modelTestNamespace, "--all")
+	cmd = exec.Command("kubectl", "delete", "user", "-n", e2eTestNamespace, "--all")
 	_, _ = utils.Run(cmd)
-	cmd = exec.Command("kubectl", "delete", "virtualkey", "-n", modelTestNamespace, "--all")
+	cmd = exec.Command("kubectl", "delete", "virtualkey", "-n", e2eTestNamespace, "--all")
 	_, _ = utils.Run(cmd)
-	cmd = exec.Command("kubectl", "delete", "model", "-n", modelTestNamespace, "--all")
+	cmd = exec.Command("kubectl", "delete", "model", "-n", e2eTestNamespace, "--all")
 	_, _ = utils.Run(cmd)
-	cmd = exec.Command("kubectl", "delete", "namespace", modelTestNamespace)
+	cmd = exec.Command("kubectl", "delete", "namespace", e2eTestNamespace)
 	_, _ = utils.Run(cmd)
 
 	By("removing manager namespace")
@@ -149,7 +164,7 @@ func waitForLiteLLMInstanceReady() error {
 	litellmInstance := &litellmv1alpha1.LiteLLMInstance{}
 	err := k8sClient.Get(context.Background(), types.NamespacedName{
 		Name:      "e2e-test-instance",
-		Namespace: modelTestNamespace,
+		Namespace: e2eTestNamespace,
 	}, litellmInstance)
 	if err != nil {
 		return err
@@ -159,7 +174,7 @@ func waitForLiteLLMInstanceReady() error {
 }
 
 func waitForPostgresInitComplete() error {
-	cmd := exec.Command("kubectl", "wait", "--for=condition=Complete", "job/litellm-postgres-1-initdb", "-n", modelTestNamespace, "--timeout=300s")
+	cmd := exec.Command("kubectl", "wait", "--for=condition=Complete", "job/litellm-postgres-1-initdb", "-n", e2eTestNamespace, "--timeout=300s")
 	_, err := utils.Run(cmd)
 	if err != nil {
 		return err
@@ -168,7 +183,7 @@ func waitForPostgresInitComplete() error {
 }
 
 func waitForPostgresPodReady() error {
-	cmd := exec.Command("kubectl", "wait", "--for=condition=Ready", "pod", "-l", "cnpg.io/instanceName=litellm-postgres-1", "-n", modelTestNamespace, "--timeout=300s")
+	cmd := exec.Command("kubectl", "wait", "--for=condition=Ready", "pod", "-l", "cnpg.io/instanceName=litellm-postgres-1", "-n", e2eTestNamespace, "--timeout=300s")
 	_, err := utils.Run(cmd)
 	if err != nil {
 		return err
@@ -190,7 +205,7 @@ func getSecret(secretName string) error {
 	secretCR := &corev1.Secret{}
 	err := k8sClient.Get(context.Background(), types.NamespacedName{
 		Name:      secretName,
-		Namespace: modelTestNamespace,
+		Namespace: e2eTestNamespace,
 	}, secretCR)
 	if err != nil {
 		// Don't wrap NotFound errors so they can be checked with errors.IsNotFound

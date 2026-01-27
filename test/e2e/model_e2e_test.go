@@ -39,22 +39,6 @@ import (
 	"github.com/bbdsoftware/litellm-operator/test/utils"
 )
 
-const (
-	modelTestNamespace = "model-e2e-test"
-	testTimeout        = 1 * time.Minute
-	testInterval       = 5 * time.Second
-)
-
-// Common string constants used when comparing condition statuses in kubectl jsonpath output
-const (
-	condStatusTrue  = "True"
-	condStatusFalse = "False"
-	statusReady     = "Ready"
-	statusError     = "Error"
-)
-
-var k8sClient client.Client
-
 func init() {
 	// Add the scheme
 	err := litellmv1alpha1.AddToScheme(scheme.Scheme)
@@ -201,7 +185,7 @@ var _ = Describe("Model E2E Tests", Ordered, func() {
 			genericSecret := &corev1.Secret{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      "invalid-openai-secret",
-					Namespace: modelTestNamespace,
+					Namespace: e2eTestNamespace,
 				},
 				Data: map[string][]byte{
 					// required fields are apiKey and apiBase, missing should be apiBase
@@ -214,7 +198,7 @@ var _ = Describe("Model E2E Tests", Ordered, func() {
 			invalidModelCr := createModelCR("invalidmodelcr", "invalid-secret")
 			invalidModelCr.Spec.ModelSecretRef = litellmv1alpha1.SecretRef{
 				SecretName: "invalid-openai-secret",
-				Namespace:  modelTestNamespace,
+				Namespace:  e2eTestNamespace,
 			}
 			Expect(k8sClient.Create(context.Background(), invalidModelCr)).To(Succeed())
 
@@ -290,7 +274,7 @@ func createPostgresInstance() {
 	}, testTimeout, testInterval).Should(Succeed())
 
 	// Wait for the cluster to be ready
-	cmd = exec.Command("kubectl", "wait", "--for=condition=Ready", "cluster/litellm-postgres", "-n", modelTestNamespace, "--timeout=300s")
+	cmd = exec.Command("kubectl", "wait", "--for=condition=Ready", "cluster/litellm-postgres", "-n", e2eTestNamespace, "--timeout=300s")
 	_, err = utils.Run(cmd)
 	Expect(err).NotTo(HaveOccurred())
 
@@ -309,7 +293,7 @@ func createLiteLLMInstance() {
 	liteLLMInstance := &litellmv1alpha1.LiteLLMInstance{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "e2e-test-instance",
-			Namespace: modelTestNamespace,
+			Namespace: e2eTestNamespace,
 		},
 		Spec: litellmv1alpha1.LiteLLMInstanceSpec{
 			Image: "ghcr.io/berriai/litellm-database:main-v1.74.9.rc.1",
@@ -332,18 +316,18 @@ func createModelCR(name, modelName string) *litellmv1alpha1.Model {
 	return &litellmv1alpha1.Model{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
-			Namespace: modelTestNamespace,
+			Namespace: e2eTestNamespace,
 		},
 		Spec: litellmv1alpha1.ModelSpec{
 			ConnectionRef: litellmv1alpha1.ConnectionRef{
 				InstanceRef: litellmv1alpha1.InstanceRef{
-					Namespace: modelTestNamespace,
+					Namespace: e2eTestNamespace,
 					Name:      "e2e-test-instance",
 				},
 			},
 			ModelName: modelName,
 			ModelSecretRef: litellmv1alpha1.SecretRef{
-				Namespace:  modelTestNamespace,
+				Namespace:  e2eTestNamespace,
 				SecretName: "test-model-secret",
 			},
 			LiteLLMParams: litellmv1alpha1.LiteLLMParams{
@@ -368,18 +352,18 @@ func createInvalidModelCR(name, modelName string) *litellmv1alpha1.Model {
 	return &litellmv1alpha1.Model{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
-			Namespace: modelTestNamespace,
+			Namespace: e2eTestNamespace,
 		},
 		Spec: litellmv1alpha1.ModelSpec{
 			ConnectionRef: litellmv1alpha1.ConnectionRef{
 				InstanceRef: litellmv1alpha1.InstanceRef{
-					Namespace: modelTestNamespace,
+					Namespace: e2eTestNamespace,
 					Name:      "e2e-test-instance",
 				},
 			},
 			ModelName: modelName,
 			ModelSecretRef: litellmv1alpha1.SecretRef{
-				Namespace:  modelTestNamespace,
+				Namespace:  e2eTestNamespace,
 				SecretName: "test-model-secret",
 			},
 			LiteLLMParams: litellmv1alpha1.LiteLLMParams{
@@ -400,7 +384,7 @@ func getModelCR(modelCRName string) (*litellmv1alpha1.Model, error) {
 	modelCR := &litellmv1alpha1.Model{}
 	err := k8sClient.Get(context.Background(), types.NamespacedName{
 		Name:      modelCRName,
-		Namespace: modelTestNamespace,
+		Namespace: e2eTestNamespace,
 	}, modelCR)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get model %s: %w", modelCRName, err)
@@ -438,7 +422,7 @@ func verifyModelDeletedFromLiteLLM(modelCRName string) error {
 	modelCR := &litellmv1alpha1.Model{}
 	err := k8sClient.Get(context.Background(), types.NamespacedName{
 		Name:      modelCRName,
-		Namespace: modelTestNamespace,
+		Namespace: e2eTestNamespace,
 	}, modelCR)
 
 	if err != nil {

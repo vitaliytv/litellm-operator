@@ -152,12 +152,12 @@ func createUserCR(name, email string) *authv1alpha1.User {
 	return &authv1alpha1.User{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
-			Namespace: modelTestNamespace,
+			Namespace: e2eTestNamespace,
 		},
 		Spec: authv1alpha1.UserSpec{
 			ConnectionRef: authv1alpha1.ConnectionRef{
 				InstanceRef: &authv1alpha1.InstanceRef{
-					Namespace: modelTestNamespace,
+					Namespace: e2eTestNamespace,
 					Name:      "e2e-test-instance",
 				},
 			},
@@ -207,7 +207,7 @@ func getUserCR(userCRName string) (*authv1alpha1.User, error) {
 	userCR := &authv1alpha1.User{}
 	err := k8sClient.Get(context.Background(), types.NamespacedName{
 		Name:      userCRName,
-		Namespace: modelTestNamespace,
+		Namespace: e2eTestNamespace,
 	}, userCR)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get user %s: %w", userCRName, err)
@@ -236,7 +236,7 @@ func verifyUserDeletedFromLiteLLM(userCRName string) error {
 	userCR := &authv1alpha1.User{}
 	err := k8sClient.Get(context.Background(), types.NamespacedName{
 		Name:      userCRName,
-		Namespace: modelTestNamespace,
+		Namespace: e2eTestNamespace,
 	}, userCR)
 
 	if err != nil {

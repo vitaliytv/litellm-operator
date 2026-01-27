@@ -3,6 +3,7 @@ package litellm
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
@@ -13,9 +14,10 @@ type LitellmVirtualKey interface {
 	DeleteVirtualKey(ctx context.Context, keyAlias string) error
 	GenerateVirtualKey(ctx context.Context, req *VirtualKeyRequest) (VirtualKeyResponse, error)
 	GetVirtualKeyFromAlias(ctx context.Context, keyAlias string) ([]string, error)
-	GetVirtualKeyInfo(ctx context.Context, key string) (VirtualKeyResponse, error)
+	GetVirtualKeyInfo(ctx context.Context, keyID string) (VirtualKeyResponse, error)
 	IsVirtualKeyUpdateNeeded(ctx context.Context, virtualKey *VirtualKeyResponse, req *VirtualKeyRequest) bool
 	UpdateVirtualKey(ctx context.Context, req *VirtualKeyRequest) (VirtualKeyResponse, error)
+	SetVirtualKeyBlockedState(ctx context.Context, key string, blocked bool) error
 }
 
 type VirtualKeyRequest struct {
@@ -174,11 +176,11 @@ func (l *LitellmClient) GetVirtualKeyFromAlias(ctx context.Context, keyAlias str
 	return response.Keys, nil
 }
 
-// GetVirtualKey gets a virtual key from the Litellm service
-func (l *LitellmClient) GetVirtualKeyInfo(ctx context.Context, key string) (VirtualKeyResponse, error) {
+// GetVirtualKeyInfo gets a virtual key from the Litellm service by key/token ID
+func (l *LitellmClient) GetVirtualKeyInfo(ctx context.Context, keyID string) (VirtualKeyResponse, error) {
 	log := log.FromContext(ctx)
 
-	body, err := l.makeRequest(ctx, "GET", "/key/info?key="+key, nil)
+	body, err := l.makeRequest(ctx, "GET", "/key/info?key="+keyID, nil)
 	if err != nil {
 		log.Error(err, "Failed to get virtual key")
 		return VirtualKeyResponse{}, err
@@ -201,6 +203,41 @@ func (l *LitellmClient) GetVirtualKeyInfo(ctx context.Context, key string) (Virt
 	}
 
 	return response.KeyInfo, nil
+}
+
+// SetVirtualKeyBlockedState sets the blocked state on the provided key
+func (l *LitellmClient) SetVirtualKeyBlockedState(ctx context.Context, key string, blocked bool) error {
+	log := log.FromContext(ctx)
+
+	formData, err := json.Marshal(map[string]string{"key": key})
+	if err != nil {
+		log.Error(err, "Failed to marshal manage virtual key blocked state request payload")
+		return err
+	}
+
+	// Call the appropriate endpoint based on the blocked state
+	path := "/key/block"
+	if !blocked {
+		path = "/key/unblock"
+	}
+
+	body, err := l.makeRequest(ctx, "POST", path, formData)
+	if err != nil {
+		log.Error(err, "Failed to update virtual key blocked state in Litellm")
+		return err
+	}
+
+	var response VirtualKeyResponse
+	if err := json.Unmarshal(body, &response); err != nil {
+		log.Error(err, "Failed to unmarshal virtual key response from Litellm")
+		return err
+	}
+
+	if response.Blocked != blocked {
+		return fmt.Errorf("failed to update virtual key blocked state: expected %t, got %t", blocked, response.Blocked)
+	}
+
+	return nil
 }
 
 // UpdateNeeded checks if the virtual key needs to be updated

@@ -99,19 +99,19 @@ func (m *mockLitellmVirtualKeyClient) GetVirtualKeyFromAlias(ctx context.Context
 	return []string{vk.Key}, nil
 }
 
-func (m *mockLitellmVirtualKeyClient) GetVirtualKeyInfo(ctx context.Context, key string) (litellm.VirtualKeyResponse, error) {
+func (m *mockLitellmVirtualKeyClient) GetVirtualKeyInfo(ctx context.Context, keyID string) (litellm.VirtualKeyResponse, error) {
 	if m.getError != nil {
 		return litellm.VirtualKeyResponse{}, m.getError
 	}
 
 	// Find by key value
 	for _, vk := range m.virtualKeys {
-		if vk.Key == key {
+		if vk.Key == keyID {
 			return *vk, nil
 		}
 	}
 
-	return litellm.VirtualKeyResponse{}, fmt.Errorf("virtual key not found: %s", key)
+	return litellm.VirtualKeyResponse{}, fmt.Errorf("virtual key not found: %s", keyID)
 }
 
 func (m *mockLitellmVirtualKeyClient) GetVirtualKey(ctx context.Context, key string) (litellm.VirtualKeyResponse, error) {
@@ -156,6 +156,10 @@ func (m *mockLitellmVirtualKeyClient) UpdateVirtualKey(ctx context.Context, req 
 	}
 
 	return litellm.VirtualKeyResponse{}, fmt.Errorf("virtual key not found")
+}
+
+func (m *mockLitellmVirtualKeyClient) SetVirtualKeyBlockedState(ctx context.Context, key string, blocked bool) error {
+	return nil
 }
 
 // Helper functions for testing

@@ -26,6 +26,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
@@ -261,6 +262,21 @@ func (r *VirtualKeyReconciler) ensureExternal(ctx context.Context, virtualKey *a
 		log.Info("Repairing drift in LiteLLM", "keyAlias", virtualKey.Spec.KeyAlias)
 		// When updating a key, we need to pass the KeyID in the request (which is the same as the Token)
 		desiredVirtualKey.Key = observedVirtualKeyDetails.Token
+
+		// handle block/unblock first
+		if desiredVirtualKey.Blocked != observedVirtualKeyDetails.Blocked {
+			key, err := r.getSecretKeyValue(ctx, virtualKey)
+			if err != nil {
+				log.Error(err, "Failed to get secret key value")
+				return r.HandleErrorRetryable(ctx, virtualKey, err, base.ReasonReconcileError)
+			}
+			err = r.LitellmClient.SetVirtualKeyBlockedState(ctx, key, desiredVirtualKey.Blocked)
+			if err != nil {
+				log.Error(err, "Failed to set virtual key blocked state in LiteLLM")
+				return r.HandleErrorRetryable(ctx, virtualKey, err, base.ReasonLitellmError)
+			}
+		}
+
 		updateResponse, err := r.LitellmClient.UpdateVirtualKey(ctx, &desiredVirtualKey)
 		if err != nil {
 			log.Error(err, "Failed to update virtual key in LiteLLM")
@@ -322,6 +338,24 @@ func (r *VirtualKeyReconciler) ensureChildren(ctx context.Context, virtualKey *a
 	})
 
 	return err
+}
+
+func (r *VirtualKeyReconciler) getSecretKeyValue(ctx context.Context, virtualKey *authv1alpha1.VirtualKey) (string, error) {
+	secret := &corev1.Secret{}
+	secretResource := types.NamespacedName{
+		Name:      virtualKey.Status.KeySecretRef,
+		Namespace: virtualKey.Namespace,
+	}
+
+	err := r.Client.Get(ctx, secretResource, secret)
+	if err != nil {
+		return "", fmt.Errorf("failed to get secret %s: %w", virtualKey.Status.KeySecretRef, err)
+	}
+	secretKeyBytes, exists := secret.Data["key"]
+	if !exists {
+		return "", fmt.Errorf("secret %s does not contain key key", virtualKey.Status.KeySecretRef)
+	}
+	return string(secretKeyBytes), nil
 }
 
 // convertToVirtualKeyRequest creates a VirtualKeyRequest from a VirtualKey (isolated for testing)
