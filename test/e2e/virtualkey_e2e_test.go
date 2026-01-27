@@ -181,44 +181,6 @@ var _ = Describe("VirtualKey E2E Tests", Ordered, func() {
 			By("cleaning up virtual key CR")
 			Expect(deleteVirtualKeyCR(keyCRName)).To(Succeed())
 		})
-
-		// TODO: blocking/unblocking virtual keys uses /key/block and /key/unblock endpoints, which are not yet implemented.
-		// 	It("should handle virtual key with blocked status", func() {
-		// 		keyAlias := "blocked-key"
-		// 		keyCRName := "blocked-key-cr"
-
-		// 		By("creating a virtual key CR with blocked status")
-		// 		keyCR := createBlockedVirtualKey(keyCRName, keyAlias)
-		// 		Expect(k8sClient.Create(context.Background(), keyCR)).To(Succeed())
-
-		// 		By("verifying the virtual key is blocked")
-		// 		Eventually(func() error {
-		// 			return verifyVirtualKeyBlockedStatus(keyCRName, true)
-		// 		}, testTimeout, testInterval).Should(Succeed())
-
-		// 		By("verifying virtual key CR has ready status")
-		// 		Eventually(func() error {
-		// 			return verifyVirtualKeyCRStatus(keyCRName, "Ready")
-		// 		}, testTimeout, testInterval).Should(Succeed())
-
-		// 		By("unblocking the virtual key")
-		// 		updatedKeyCR := &authv1alpha1.VirtualKey{}
-		// 		Expect(k8sClient.Get(context.Background(), types.NamespacedName{
-		// 			Name:      keyCRName,
-		// 			Namespace: modelTestNamespace,
-		// 		}, updatedKeyCR)).To(Succeed())
-
-		// 		updatedKeyCR.Spec.Blocked = false
-		// 		Expect(k8sClient.Update(context.Background(), updatedKeyCR)).To(Succeed())
-
-		// 		By("verifying the virtual key is no longer blocked")
-		// 		Eventually(func() error {
-		// 			return verifyVirtualKeyBlockedStatus(keyCRName, false)
-		// 		}, testTimeout, testInterval).Should(Succeed())
-
-		// 		By("cleaning up virtual key CR")
-		// 		Expect(k8sClient.Delete(context.Background(), updatedKeyCR)).To(Succeed())
-		// 	})
 	})
 
 	Context("VirtualKey Validation", func() {

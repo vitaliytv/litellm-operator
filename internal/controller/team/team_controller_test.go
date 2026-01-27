@@ -146,6 +146,10 @@ func (m *mockLitellmTeamClient) UpdateTeam(ctx context.Context, req *litellm.Tea
 	return *team, nil
 }
 
+func (m *mockLitellmTeamClient) SetTeamBlockedState(ctx context.Context, teamID string, blocked bool) error {
+	return nil
+}
+
 // Helper function to create test team
 func createTestTeam() *authv1alpha1.Team {
 	const testTeamName = "test-team"
