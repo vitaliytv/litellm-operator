@@ -74,8 +74,19 @@ The operator supports the following environment variables:
 |----------|-------------|---------|
 | `LITELLM_BASE_URL` | Base URL for LiteLLM API | `http://litellm:4000` |
 | `LITELLM_API_KEY` | API key for LiteLLM authentication | Required |
-| `METRICS_BIND_ADDRESS` | Address for metrics server | `:8080` |
+| `LITELLM_URL_OVERRIDE` | Overrides the base URL for LiteLLM instances (internal service URL) | None |
+| `METRICS_BIND_ADDRESS` | Address for metrics server | `:8443` |
 | `HEALTH_PROBE_BIND_ADDRESS` | Address for health probes | `:8081` |
+
+### Helm Configuration
+
+When using Helm, you can set the URL override in your `values.yaml`:
+
+```yaml
+controllerManager:
+  manager:
+    litellmUrlOverride: "http://custom-litellm-service:4000"
+```
 
 ## Troubleshooting
 
@@ -100,4 +111,4 @@ The operator supports the following environment variables:
 
 ## Next Steps
 
-Once installed, proceed to the [Quick Start Guide](quickstart.md) to create your first resources. 
+Once installed, proceed to the [Quick Start Guide](quickstart.md) to create your first resources.
