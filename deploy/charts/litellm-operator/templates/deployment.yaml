@@ -26,6 +26,10 @@ spec:
         env:
         - name: KUBERNETES_CLUSTER_DOMAIN
           value: {{ quote .Values.kubernetesClusterDomain }}
+        {{- if .Values.controllerManager.manager.litellmUrlOverride }}
+        - name: LITELLM_URL_OVERRIDE
+          value: {{ quote .Values.controllerManager.manager.litellmUrlOverride }}
+        {{- end }}
         image: {{ .Values.controllerManager.manager.image.repository }}:{{ .Values.controllerManager.manager.image.tag
           | default .Chart.AppVersion }}
         livenessProbe:
