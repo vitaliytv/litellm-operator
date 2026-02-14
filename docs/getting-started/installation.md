@@ -72,6 +72,8 @@ The operator supports the following environment variables:
 
 | Variable | Description | Default |
 |----------|-------------|---------|
+| `LITELLM_BASE_URL` | Base URL for LiteLLM API | `http://litellm:4000` |
+| `LITELLM_API_KEY` | API key for LiteLLM authentication | Required |
 | `LITELLM_URL_OVERRIDE` | Overrides the base URL for LiteLLM instances (internal service URL) | None |
 | `METRICS_BIND_ADDRESS` | Address for metrics server | `:8443` |
 | `HEALTH_PROBE_BIND_ADDRESS` | Address for health probes | `:8081` |
