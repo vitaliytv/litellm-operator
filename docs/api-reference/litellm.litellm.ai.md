@@ -198,6 +198,7 @@ _Appears in:_
 | --- | --- | --- | --- |
 | `image` _string_ |  | ghcr.io/berriai/litellm-database:main-v1.74.9.rc.1 |  |
 | `masterKey` _string_ |  |  |  |
+| `masterKeySecretRef` _[SecretKeySelector](https://kubernetes.io/docs/reference/generated/kubernetes-api/v/#secretkeyselector-v1-core)_ | MasterKeySecretRef allows providing the master key from an existing secret.<br />If set, it takes precedence over the MasterKey field. |  |  |
 | `databaseSecretRef` _[DatabaseSecretRef](#databasesecretref)_ |  |  |  |
 | `redisSecretRef` _[RedisSecretRef](#redissecretref)_ |  |  |  |
 | `ingress` _[Ingress](#ingress)_ |  |  |  |

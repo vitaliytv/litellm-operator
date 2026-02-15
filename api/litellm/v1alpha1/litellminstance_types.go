@@ -27,6 +27,10 @@ type LiteLLMInstanceSpec struct {
 	// +kubebuilder:default="ghcr.io/berriai/litellm-database:main-v1.74.9.rc.1"
 	Image             string            `json:"image"`
 	MasterKey         string            `json:"masterKey,omitempty"`
+	// MasterKeySecretRef allows providing the master key from an existing secret.
+	// If set, it takes precedence over the MasterKey field.
+	// +optional
+	MasterKeySecretRef *corev1.SecretKeySelector `json:"masterKeySecretRef,omitempty"`
 	DatabaseSecretRef DatabaseSecretRef `json:"databaseSecretRef,omitempty"`
 	RedisSecretRef    RedisSecretRef    `json:"redisSecretRef,omitempty"`
 	Ingress           Ingress           `json:"ingress,omitempty"`

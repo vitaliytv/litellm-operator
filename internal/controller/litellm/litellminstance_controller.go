@@ -1306,17 +1306,27 @@ func buildContainerSpec(llm *litellmv1alpha1.LiteLLMInstance, secretName string,
 // It creates environment variables for the LiteLLM master key and database connection details.
 func buildEnvironmentVariables(llm *litellmv1alpha1.LiteLLMInstance, secretName string, ctx context.Context, k8sClient client.Client) []corev1.EnvVar {
 	log := logf.FromContext(ctx)
+	// Determine where the master key comes from
+	var masterKeySource *corev1.EnvVarSource
+	if llm.Spec.MasterKeySecretRef != nil {
+		masterKeySource = &corev1.EnvVarSource{
+			SecretKeyRef: llm.Spec.MasterKeySecretRef,
+		}
+	} else {
+		masterKeySource = &corev1.EnvVarSource{
+			SecretKeyRef: &corev1.SecretKeySelector{
+				LocalObjectReference: corev1.LocalObjectReference{
+					Name: secretName,
+				},
+				Key: "masterkey",
+			},
+		}
+	}
+
 	envVars := []corev1.EnvVar{
 		{
-			Name: "LITELLM_MASTER_KEY",
-			ValueFrom: &corev1.EnvVarSource{
-				SecretKeyRef: &corev1.SecretKeySelector{
-					LocalObjectReference: corev1.LocalObjectReference{
-						Name: secretName,
-					},
-					Key: "masterkey",
-				},
-			},
+			Name:      "LITELLM_MASTER_KEY",
+			ValueFrom: masterKeySource,
 		},
 	}
 

@@ -4,10 +4,10 @@ metadata:
   name: litellm-example
   namespace: litellm
 spec:
-  replicas: 1
-  # extraEnvVars:
-  #   - name: PROXY_BASE_URL
-  #     value: http://proxy.litellm.litellm.ai
+  masterKey: "sk-1234567890abcdef"
+  # masterKeySecretRef:
+  #   name: my-master-key-secret
+  #   key: masterkey
   redisSecretRef:
     nameRef:  redis-secret
     keys:

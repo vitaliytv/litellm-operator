@@ -360,4 +360,57 @@ var _ = Describe("LiteLLMInstance helpers and rendering", func() {
 		Expect(yamlStr).To(ContainSubstring("os.environ/"))
 	})
 
+	It("buildEnvironmentVariables should use MasterKeySecretRef when provided", func() {
+		llm := &litellmv1alpha1.LiteLLMInstance{
+			Spec: litellmv1alpha1.LiteLLMInstanceSpec{
+				MasterKeySecretRef: &corev1.SecretKeySelector{
+					LocalObjectReference: corev1.LocalObjectReference{
+						Name: "custom-secret",
+					},
+					Key: "custom-key",
+				},
+			},
+		}
+
+		envVars := buildEnvironmentVariables(llm, "managed-secret", ctx, k8sClient)
+
+		var masterKeyEnv *corev1.EnvVar
+		for i := range envVars {
+			if envVars[i].Name == "LITELLM_MASTER_KEY" {
+				masterKeyEnv = &envVars[i]
+				break
+			}
+		}
+
+		Expect(masterKeyEnv).NotTo(BeNil())
+		Expect(masterKeyEnv.ValueFrom).NotTo(BeNil())
+		Expect(masterKeyEnv.ValueFrom.SecretKeyRef).NotTo(BeNil())
+		Expect(masterKeyEnv.ValueFrom.SecretKeyRef.Name).To(Equal("custom-secret"))
+		Expect(masterKeyEnv.ValueFrom.SecretKeyRef.Key).To(Equal("custom-key"))
+	})
+
+	It("buildEnvironmentVariables should use managed secret for MasterKey when MasterKeySecretRef is nil", func() {
+		llm := &litellmv1alpha1.LiteLLMInstance{
+			Spec: litellmv1alpha1.LiteLLMInstanceSpec{
+				MasterKey: "some-key",
+			},
+		}
+
+		envVars := buildEnvironmentVariables(llm, "managed-secret", ctx, k8sClient)
+
+		var masterKeyEnv *corev1.EnvVar
+		for i := range envVars {
+			if envVars[i].Name == "LITELLM_MASTER_KEY" {
+				masterKeyEnv = &envVars[i]
+				break
+			}
+		}
+
+		Expect(masterKeyEnv).NotTo(BeNil())
+		Expect(masterKeyEnv.ValueFrom).NotTo(BeNil())
+		Expect(masterKeyEnv.ValueFrom.SecretKeyRef).NotTo(BeNil())
+		Expect(masterKeyEnv.ValueFrom.SecretKeyRef.Name).To(Equal("managed-secret"))
+		Expect(masterKeyEnv.ValueFrom.SecretKeyRef.Key).To(Equal("masterkey"))
+	})
+
 })

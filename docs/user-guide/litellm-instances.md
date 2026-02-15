@@ -49,6 +49,10 @@ metadata:
 spec:
   image: "ghcr.io/berriai/litellm-database:main-v1.74.9.rc.1"
   masterKey: "sk-1234567890abcdef"
+  # Alternative: provide master key from a secret
+  # masterKeySecretRef:
+  #   name: my-master-key-secret
+  #   key: masterkey
   replicas: 3
   redisSecretRef:
     nameRef: redis-production
@@ -102,6 +106,7 @@ spec:
 |-------|------|-------------|----------|
 | `image` | string | LiteLLM Docker image | No (default: ghcr.io/berriai/litellm-database:main-v1.74.9.rc.1) |
 | `masterKey` | string | Master API key for the instance | No |
+| `masterKeySecretRef` | object | Reference to a secret containing the master API key. If set, it takes precedence over `masterKey`. | No |
 | `databaseSecretRef` | object | PostgreSQL database configuration | No |
 | `redisSecretRef` | object | Redis cache configuration | No |
 | `ingress` | object | Kubernetes ingress configuration | No |
@@ -370,4 +375,4 @@ spec:
 ## Next Steps
 
 - Learn about [Users](users.md), [Teams](teams.md), and [Virtual Keys](virtual-keys.md)
-- Review [security best practices](../community/security.md) 
+- Review [security best practices](../community/security.md)
