@@ -7,6 +7,7 @@ A Helm chart for deploying the LiteLLM Operator, a Kubernetes operator for manag
 | Key | Type | Default | Description |
 |-----------|------|---------|-------------|
 | `controllerManager.manager.image.repository` | string | `ghcr.io/bbdsoftware/litellm-operator` | Controller image repository |
+| `controllerManager.manager.litellmUrlOverride` | string | `""` | Overrides the base URL for LiteLLM instances (internal service URL) |
 | `controllerManager.manager.resources.limits.cpu` | string | `200m` | CPU resource limit |
 | `controllerManager.manager.resources.limits.memory` | string | `128Mi` | Memory resource limit |
 | `controllerManager.manager.resources.requests.cpu` | string | `50m` | CPU resource request |
