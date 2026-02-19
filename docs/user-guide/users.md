@@ -61,6 +61,30 @@ spec:
       namespace: litellm
 ```
 
+### User Without Auto-Created Key
+
+When `autoCreateKey: false`, no virtual key is created for the user. The user account is created in LiteLLM only; you can attach a key later via a separate [VirtualKey](virtual-keys.md) resource. The `keyAlias` field is ignored when `autoCreateKey` is false.
+
+```yaml
+apiVersion: auth.litellm.ai/v1alpha1
+kind: User
+metadata:
+  name: external-user
+spec:
+  userEmail: "user@example.com"
+  userAlias: "external-user"
+  userRole: "internal_user_viewer"
+  autoCreateKey: false
+  models:
+    - "gpt-4o"
+  maxBudget: "50"
+  budgetDuration: 7d
+  connectionRef:
+    instanceRef:
+      name: litellm-example
+      namespace: litellm
+```
+
 ## Specification Reference
 
 | Field | Type | Description | Required |
@@ -68,8 +92,8 @@ spec:
 | `userEmail` | string | User's email address | Yes |
 | `userAlias` | string | User alias/username | Yes |
 | `userRole` | string | User role (one of "proxy_admin", "proxy_admin_viewer", "internal_user", "internal_user_viewer") | Yes |
-| `keyAlias` | string | Alias for the virtual key | No |
-| `autoCreateKey` | boolean | Automatically create virtual key | Yes |
+| `keyAlias` | string | Alias for the virtual key when `autoCreateKey` is true; ignored when `autoCreateKey` is false | No |
+| `autoCreateKey` | boolean | When true, a virtual key is created automatically with the given `keyAlias`. When false, no key is created. | No (default: false) |
 | `models` | []string | Allowed models for this user | No |
 | `maxBudget` | string | Maximum spend limit in dollars | Yes |
 | `budgetDuration` | string | Budget duration (e.g., "1h", "30d") | Yes |
@@ -105,7 +129,7 @@ kubectl delete user alice
 
 - Set appropriate budget limits based on usage patterns
 - Use meaningful key aliases for easy identification
-- Enable autoCreateKey for seamless user onboarding
+- Use `autoCreateKey: true` with a `keyAlias` for seamless user onboarding when a key is needed; use `autoCreateKey: false` when the user will use a separately managed VirtualKey
 - Set reasonable budget durations to prevent overspending
 - Regularly review and update user permissions
 

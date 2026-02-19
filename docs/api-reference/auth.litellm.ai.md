@@ -377,12 +377,12 @@ _Appears in:_
 | `connectionRef` _[ConnectionRef](#connectionref)_ | ConnectionRef defines how to connect to the LiteLLM instance |  | Required: \{\} <br /> |
 | `aliases` _object (keys:string, values:string)_ | Aliases is the model aliases for the user |  |  |
 | `allowedCacheControls` _string array_ | AllowedCacheControls is the list of allowed cache control values |  |  |
-| `autoCreateKey` _boolean_ | AutoCreateKey is whether to automatically create a key for the user |  |  |
+| `autoCreateKey` _boolean_ | AutoCreateKey is whether to automatically create a key for the user. When false, no key is created and keyAlias is not sent to the API. |  |  |
 | `blocked` _boolean_ | Blocked is whether the user is blocked |  |  |
 | `budgetDuration` _string_ | BudgetDuration - Budget is reset at the end of specified duration. If not set, budget is never reset. You can set duration as seconds ("30s"), minutes ("30m"), hours ("30h"), days ("30d"), months ("1mo"). |  |  |
 | `duration` _string_ | Duration is the duration for the key auto-created on /user/new |  |  |
 | `guardrails` _string array_ | Guardrails is the list of active guardrails for the user |  |  |
-| `keyAlias` _string_ | KeyAlias is the optional alias of the key if autoCreateKey is true |  |  |
+| `keyAlias` _string_ | KeyAlias is the optional alias of the key when autoCreateKey is true. Ignored when autoCreateKey is false (not sent to the API). |  |  |
 | `maxBudget` _string_ | MaxBudget is the maximum budget for the user |  |  |
 | `maxParallelRequests` _integer_ | MaxParallelRequests is the maximum number of parallel requests for the user |  |  |
 | `metadata` _object (keys:string, values:string)_ | Refer to Kubernetes API documentation for fields of `metadata`. |  |  |

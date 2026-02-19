@@ -194,7 +194,7 @@ Look for status fields:
 
 ## Integration with Users and Teams
 
-Virtual Keys can be created automatically when users are created (using `autoCreateKey: true` in User resources) or created independently for service accounts and applications.
+Virtual Keys can be created automatically when users are created (using `autoCreateKey: true` in User resources) or created independently for service accounts and applications. When a User has `autoCreateKey: false`, no key is created and you can attach keys later via VirtualKey resources.
 
 ### Auto-Created Keys
 
