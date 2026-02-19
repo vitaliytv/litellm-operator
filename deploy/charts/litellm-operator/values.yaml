@@ -14,6 +14,7 @@ controllerManager:
     image:
       repository: ghcr.io/bbdsoftware/litellm-operator
       tag: 1.1.0
+    litellmUrlOverride: ""
     resources:
       limits:
         cpu: 200m
