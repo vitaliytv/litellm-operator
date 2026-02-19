@@ -13,7 +13,7 @@ controllerManager:
           - ALL
     image:
       repository: ghcr.io/bbdsoftware/litellm-operator
-      tag: 1.1.0
+      tag: 1.1.1
     litellmUrlOverride: ""
     resources:
       limits:
