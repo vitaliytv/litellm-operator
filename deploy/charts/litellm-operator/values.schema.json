@@ -74,6 +74,11 @@
                 }
               }
             },
+            "litellmUrlOverride": {
+              "type": "string",
+              "description": "Overrides the base URL for LiteLLM instances (internal service URL)",
+              "default": ""
+            },
             "resources": {
               "type": "object",
               "description": "Resource limits and requests",
