@@ -621,7 +621,7 @@ func buildSecretData(masterKey string, existingSecret *corev1.Secret) map[string
 			}
 		}
 		// Generate a new random master key if none exists
-		masterKey = uuid.New().String()
+		masterKey = "sk-" + uuid.New().String()
 	}
 
 	// Add master key (either provided or generated)
