@@ -316,6 +316,10 @@ func (r *UserReconciler) ensureChildren(ctx context.Context, user *authv1alpha1.
 
 // convertToUserRequest creates a UserRequest from a User (isolated for testing)
 func (r *UserReconciler) convertToUserRequest(user *authv1alpha1.User) (litellm.UserRequest, error) {
+	keyAlias := ""
+	if user.Spec.AutoCreateKey {
+		keyAlias = user.Spec.KeyAlias
+	}
 	userRequest := litellm.UserRequest{
 		Aliases:              user.Spec.Aliases,
 		AllowedCacheControls: user.Spec.AllowedCacheControls,
@@ -324,7 +328,7 @@ func (r *UserReconciler) convertToUserRequest(user *authv1alpha1.User) (litellm.
 		BudgetDuration:       user.Spec.BudgetDuration,
 		Duration:             user.Spec.Duration,
 		Guardrails:           user.Spec.Guardrails,
-		KeyAlias:             user.Spec.KeyAlias,
+		KeyAlias:             keyAlias,
 		MaxParallelRequests:  user.Spec.MaxParallelRequests,
 		Metadata:             util.EnsureMetadata(user.Spec.Metadata),
 		ModelMaxBudget:       user.Spec.ModelMaxBudget,
