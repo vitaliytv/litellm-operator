@@ -24,7 +24,7 @@ type LitellmUser interface {
 type UserRequest struct {
 	Aliases              map[string]string `json:"aliases,omitempty"`
 	AllowedCacheControls []string          `json:"allowed_cache_controls,omitempty"`
-	AutoCreateKey        bool              `json:"auto_create_key,omitempty"`
+	AutoCreateKey        bool              `json:"auto_create_key"`
 	Blocked              bool              `json:"blocked,omitempty"`
 	BudgetDuration       string            `json:"budget_duration,omitempty"`
 	Config               map[string]string `json:"config,omitempty"`
