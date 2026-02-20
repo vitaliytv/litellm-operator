@@ -1517,7 +1517,7 @@ func mergeProbeSettings(defaultProbe, customProbe *corev1.Probe) {
 	if customProbe.SuccessThreshold != 0 {
 		defaultProbe.SuccessThreshold = customProbe.SuccessThreshold
 	}
-    if customProbe.TerminationGracePeriodSeconds != nil {
+	if customProbe.TerminationGracePeriodSeconds != nil {
 		defaultProbe.TerminationGracePeriodSeconds = customProbe.TerminationGracePeriodSeconds
 	}
 	// If the user specified a non-empty handler, use it entirely.
