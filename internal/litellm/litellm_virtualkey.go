@@ -39,7 +39,7 @@ type VirtualKeyRequest struct {
 	ModelMaxBudget       map[string]string `json:"model_max_budget,omitempty"`
 	ModelRPMLimit        map[string]int    `json:"model_rpm_limit,omitempty"`
 	ModelTPMLimit        map[string]int    `json:"model_tpm_limit,omitempty"`
-	Models               []string          `json:"models,omitempty"`
+	Models               []string          `json:"models"`
 	Permissions          map[string]string `json:"permissions,omitempty"`
 	RPMLimit             int               `json:"rpm_limit,omitempty"`
 	SendInviteEmail      bool              `json:"send_invite_email,omitempty"`
