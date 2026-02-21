@@ -330,7 +330,6 @@ func (r *UserReconciler) convertToUserRequest(user *authv1alpha1.User) (litellm.
 		ModelMaxBudget:       user.Spec.ModelMaxBudget,
 		ModelRPMLimit:        user.Spec.ModelRPMLimit,
 		ModelTPMLimit:        user.Spec.ModelTPMLimit,
-		Models:               user.Spec.Models,
 		Permissions:          user.Spec.Permissions,
 		RPMLimit:             user.Spec.RPMLimit,
 		SendInviteEmail:      user.Spec.SendInviteEmail,
@@ -341,6 +340,12 @@ func (r *UserReconciler) convertToUserRequest(user *authv1alpha1.User) (litellm.
 		UserEmail:            user.Spec.UserEmail,
 		UserID:               user.Spec.UserID,
 		UserRole:             user.Spec.UserRole,
+	}
+
+	// Omit (models not set) → do not send "models" to API → LiteLLM allows all models.
+	// Explicit empty list (models: []) → send "models": [] → user has no model access.
+	if user.Spec.Models != nil {
+		userRequest.Models = user.Spec.Models
 	}
 
 	if user.Spec.MaxBudget != "" {

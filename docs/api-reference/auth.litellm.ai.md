@@ -389,7 +389,7 @@ _Appears in:_
 | `modelMaxBudget` _object (keys:string, values:string)_ | ModelMaxBudget is the model specific maximum budget |  |  |
 | `modelRPMLimit` _object (keys:string, values:string)_ | ModelRPMLimit is the model specific maximum requests per minute |  |  |
 | `modelTPMLimit` _object (keys:string, values:string)_ | ModelTPMLimit is the model specific maximum tokens per minute |  |  |
-| `models` _string array_ | Models is the list of models that the user is allowed to use |  |  |
+| `models` _string array_ | Models the user is allowed to use. Omit to allow all models; use empty list for no model access. |  |  |
 | `permissions` _object (keys:string, values:string)_ | Permissions is the user-specific permissions |  |  |
 | `rpmLimit` _integer_ | RPMLimit is the maximum requests per minute for the user |  |  |
 | `sendInviteEmail` _boolean_ | SendInviteEmail is whether to send an invite email to the user - NOTE: the user endpoint will return an error if email alerting is not configured and this is enabled, but the user will still be created. |  |  |
@@ -439,7 +439,7 @@ _Appears in:_
 | `modelMaxBudget` _object (keys:string, values:string)_ | ModelMaxBudget is the model specific maximum budget |  |  |
 | `modelRPMLimit` _object (keys:string, values:string)_ | ModelRPMLimit is the model specific maximum requests per minute |  |  |
 | `modelTPMLimit` _object (keys:string, values:string)_ | ModelTPMLimit is the model specific maximum tokens per minute |  |  |
-| `models` _string array_ | Models is the list of models that the user is allowed to use |  |  |
+| `models` _string array_ | Models the user is allowed to use. Omit to allow all models; use empty list for no model access. |  |  |
 | `permissions` _object (keys:string, values:string)_ | Permissions is the user-specific permissions |  |  |
 | `rpmLimit` _integer_ | RPMLimit is the maximum requests per minute |  |  |
 | `spend` _string_ | Spend is the amount spent by user |  |  |
@@ -531,7 +531,7 @@ _Appears in:_
 | `modelMaxBudget` _object (keys:string, values:string)_ | ModelMaxBudget sets budget limits per model |  |  |
 | `modelRPMLimit` _object (keys:string, values:integer)_ | ModelRPMLimit sets RPM limits per model |  |  |
 | `modelTPMLimit` _object (keys:string, values:integer)_ | ModelTPMLimit sets TPM limits per model |  |  |
-| `models` _string array_ | Models specifies which models can be used |  |  |
+| `models` _string array_ | Models the key can use. Omit to allow all models; use empty list for no model access. |  |  |
 | `permissions` _object (keys:string, values:string)_ | Permissions defines key permissions |  |  |
 | `rpmLimit` _integer_ | RPMLimit sets global RPM limit |  |  |
 | `sendInviteEmail` _boolean_ | SendInviteEmail indicates whether to send an invite email |  |  |
@@ -577,7 +577,7 @@ _Appears in:_
 | `liteLLMBudgetTable` _string_ | LiteLLMBudgetTable is the budget table reference |  |  |
 | `maxBudget` _string_ | MaxBudget is the maximum budget for the key |  |  |
 | `maxParallelRequests` _integer_ | MaxParallelRequests limits concurrent requests |  |  |
-| `models` _string array_ | Models specifies which models can be used |  |  |
+| `models` _string array_ | Models the key can use. Omit to allow all models; use empty list for no model access. |  |  |
 | `permissions` _object (keys:string, values:string)_ | Permissions defines key permissions |  |  |
 | `rpmLimit` _integer_ | RPMLimit sets global RPM limit |  |  |
 | `spend` _string_ | Spend tracks the current spend amount |  |  |

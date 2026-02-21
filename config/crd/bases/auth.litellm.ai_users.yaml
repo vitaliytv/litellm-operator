@@ -179,8 +179,8 @@ spec:
                   minute
                 type: object
               models:
-                description: Models is the list of models that the user is allowed
-                  to use
+                description: Models the user is allowed to use. Omit to allow all
+                  models; use empty list for no model access.
                 items:
                   type: string
                 type: array
@@ -393,8 +393,8 @@ spec:
                   minute
                 type: object
               models:
-                description: Models is the list of models that the user is allowed
-                  to use
+                description: Models the user is allowed to use. Omit to allow all
+                  models; use empty list for no model access.
                 items:
                   type: string
                 type: array

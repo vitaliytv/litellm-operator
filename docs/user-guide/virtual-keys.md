@@ -13,7 +13,48 @@ Virtual Keys in the LiteLLM Operator provide:
 
 ## Creating Virtual Keys
 
-### Basic Virtual Key
+### Virtual Key with All Models
+
+Omit the `models` field to allow access to all models:
+
+```yaml
+apiVersion: auth.litellm.ai/v1alpha1
+kind: VirtualKey
+metadata:
+  name: example-service
+spec:
+  keyAlias: example-service
+  maxBudget: "10"
+  budgetDuration: 1h
+  connectionRef:
+    instanceRef:
+      name: litellm-example
+      namespace: litellm
+```
+
+### Virtual Key with No Model Access
+
+Set `models: []` to restrict the key to no models (no model access):
+
+```yaml
+apiVersion: auth.litellm.ai/v1alpha1
+kind: VirtualKey
+metadata:
+  name: restricted-key
+spec:
+  keyAlias: restricted-key
+  models: []
+  maxBudget: "10"
+  budgetDuration: 1h
+  connectionRef:
+    instanceRef:
+      name: litellm-example
+      namespace: litellm
+```
+
+### Virtual Key with Specific Models
+
+Specify a list to restrict the key to certain models only:
 
 ```yaml
 apiVersion: auth.litellm.ai/v1alpha1
@@ -58,7 +99,7 @@ spec:
 | Field | Type | Description | Required |
 |-------|------|-------------|----------|
 | `keyAlias` | string | Unique identifier for the key | Yes |
-| `models` | []string | Allowed models (empty = all models) | No |
+| `models` | []string | Allowed models. **Omit** this field to allow **all models**. Set `models: []` to restrict the key to no models. Specify a list to restrict the key to those models only. | No |
 | `maxBudget` | string | Maximum spend limit in dollars | Yes |
 | `budgetDuration` | string | Budget duration (e.g., "1h", "30d") | Yes |
 | `connectionRef` | object | Reference to LiteLLM instance | Yes |

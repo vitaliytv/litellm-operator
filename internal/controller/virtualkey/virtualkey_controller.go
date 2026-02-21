@@ -378,7 +378,6 @@ func (r *VirtualKeyReconciler) convertToVirtualKeyRequest(virtualKey *authv1alph
 		ModelMaxBudget:       virtualKey.Spec.ModelMaxBudget,
 		ModelRPMLimit:        virtualKey.Spec.ModelRPMLimit,
 		ModelTPMLimit:        virtualKey.Spec.ModelTPMLimit,
-		Models:               virtualKey.Spec.Models,
 		Permissions:          virtualKey.Spec.Permissions,
 		RPMLimit:             virtualKey.Spec.RPMLimit,
 		SendInviteEmail:      virtualKey.Spec.SendInviteEmail,
@@ -386,6 +385,12 @@ func (r *VirtualKeyReconciler) convertToVirtualKeyRequest(virtualKey *authv1alph
 		TeamID:               virtualKey.Spec.TeamID,
 		TPMLimit:             virtualKey.Spec.TPMLimit,
 		UserID:               virtualKey.Spec.UserID,
+	}
+
+	// Omit (field not set) → do not set request.Models (nil) → API omits "models" → all models allowed.
+	// Explicit empty list (models: []) → set request.Models = [] → API sends "models": [] → no model access.
+	if virtualKey.Spec.Models != nil {
+		virtualKeyRequest.Models = virtualKey.Spec.Models
 	}
 
 	if virtualKey.Spec.MaxBudget != "" {

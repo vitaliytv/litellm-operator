@@ -14,7 +14,56 @@ User resources in the LiteLLM Operator provide:
 
 ## Creating Users
 
-### Basic User
+### Basic User (All Models)
+
+Omit the `models` field to allow the user access to all models:
+
+```yaml
+apiVersion: auth.litellm.ai/v1alpha1
+kind: User
+metadata:
+  name: alice
+spec:
+  userEmail: "alice@example.com"
+  userAlias: "alice"
+  userRole: "internal_user_viewer"
+  keyAlias: "alice-key"
+  autoCreateKey: true
+  maxBudget: "10"
+  budgetDuration: 1h
+  connectionRef:
+    instanceRef:
+      name: litellm-example
+      namespace: litellm
+```
+
+### User with No Model Access
+
+Set `models: []` to restrict the user to no models (no model access):
+
+```yaml
+apiVersion: auth.litellm.ai/v1alpha1
+kind: User
+metadata:
+  name: restricted-user
+spec:
+  userEmail: "restricted@example.com"
+  userAlias: "restricted"
+  userRole: "internal_user_viewer"
+  keyAlias: "restricted-key"
+  autoCreateKey: true
+  models: []
+  maxBudget: "10"
+  budgetDuration: 1h
+  connectionRef:
+    instanceRef:
+      name: litellm-example
+      namespace: litellm
+```
+
+### User with Specific Models
+
+Specify a list to restrict the user to certain models only:
 
 ```yaml
 apiVersion: auth.litellm.ai/v1alpha1
@@ -70,7 +119,7 @@ spec:
 | `userRole` | string | User role (one of "proxy_admin", "proxy_admin_viewer", "internal_user", "internal_user_viewer") | Yes |
 | `keyAlias` | string | Alias for the virtual key | No |
 | `autoCreateKey` | boolean | Automatically create virtual key | Yes |
-| `models` | []string | Allowed models for this user | No |
+| `models` | []string | Allowed models. **Omit** this field to allow **all models**. Set `models: []` to restrict the user to no models. Specify a list to restrict the user to those models only. | No |
 | `maxBudget` | string | Maximum spend limit in dollars | Yes |
 | `budgetDuration` | string | Budget duration (e.g., "1h", "30d") | Yes |
 | `connectionRef` | object | Reference to LiteLLM instance | Yes |

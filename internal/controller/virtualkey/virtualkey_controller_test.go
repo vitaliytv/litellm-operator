@@ -530,5 +530,53 @@ var _ = Describe("VirtualKey Controller", func() {
 			Expect(err).To(HaveOccurred())
 			Expect(err.Error()).To(ContainSubstring("maxBudget"))
 		})
+
+		It("omitted models → nil (all models allowed)", func() {
+			virtualKey.Spec.Models = nil
+			request, err := reconciler.convertToVirtualKeyRequest(virtualKey)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(request.Models).To(BeNil())
+		})
+
+		It("empty list models → empty slice (no model access)", func() {
+			virtualKey.Spec.Models = []string{}
+			request, err := reconciler.convertToVirtualKeyRequest(virtualKey)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(request.Models).NotTo(BeNil())
+			Expect(request.Models).To(HaveLen(0))
+		})
+
+		It("models list set → same list in request", func() {
+			virtualKey.Spec.Models = []string{"gpt-4", "gpt-3.5-turbo"}
+			request, err := reconciler.convertToVirtualKeyRequest(virtualKey)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(request.Models).To(Equal([]string{"gpt-4", "gpt-3.5-turbo"}))
+		})
+
+		It("all three models cases produce different results", func() {
+			// Omit: request.Models must be nil
+			virtualKey.Spec.Models = nil
+			reqOmit, err := reconciler.convertToVirtualKeyRequest(virtualKey)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(reqOmit.Models).To(BeNil())
+
+			// Empty list: request.Models must be non-nil empty slice
+			virtualKey.Spec.Models = []string{}
+			reqEmpty, err := reconciler.convertToVirtualKeyRequest(virtualKey)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(reqEmpty.Models).NotTo(BeNil())
+			Expect(reqEmpty.Models).To(HaveLen(0))
+
+			// Non-empty list: request.Models must be the same slice
+			virtualKey.Spec.Models = []string{"gpt-4"}
+			reqList, err := reconciler.convertToVirtualKeyRequest(virtualKey)
+			Expect(err).NotTo(HaveOccurred())
+			Expect(reqList.Models).To(Equal([]string{"gpt-4"}))
+
+			// All three outcomes must differ: nil vs [] vs [gpt-4]
+			Expect(reqOmit.Models).NotTo(Equal(reqEmpty.Models))
+			Expect(reqEmpty.Models).NotTo(Equal(reqList.Models))
+			Expect(reqOmit.Models).NotTo(Equal(reqList.Models))
+		})
 	})
 })

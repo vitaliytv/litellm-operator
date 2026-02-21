@@ -59,7 +59,7 @@ type UserSpec struct {
 	ModelRPMLimit map[string]string `json:"modelRPMLimit,omitempty"`
 	// ModelTPMLimit is the model specific maximum tokens per minute
 	ModelTPMLimit map[string]string `json:"modelTPMLimit,omitempty"`
-	// Models is the list of models that the user is allowed to use
+	// Models the user is allowed to use. Omit to allow all models; use empty list for no model access.
 	Models []string `json:"models,omitempty"`
 	// Permissions is the user-specific permissions
 	Permissions map[string]string `json:"permissions,omitempty"`
@@ -139,7 +139,7 @@ type UserStatus struct {
 	ModelRPMLimit map[string]string `json:"modelRPMLimit,omitempty"`
 	// ModelTPMLimit is the model specific maximum tokens per minute
 	ModelTPMLimit map[string]string `json:"modelTPMLimit,omitempty"`
-	// Models is the list of models that the user is allowed to use
+	// Models the user is allowed to use. Omit to allow all models; use empty list for no model access.
 	Models []string `json:"models,omitempty"`
 	// Permissions is the user-specific permissions
 	Permissions map[string]string `json:"permissions,omitempty"`

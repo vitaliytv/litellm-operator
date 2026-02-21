@@ -67,7 +67,7 @@ type VirtualKeySpec struct {
 	ModelRPMLimit map[string]int `json:"modelRPMLimit,omitempty"`
 	// ModelTPMLimit sets TPM limits per model
 	ModelTPMLimit map[string]int `json:"modelTPMLimit,omitempty"`
-	// Models specifies which models can be used
+	// Models specifies which models can be used. Omit to allow all models; use empty list for no model access.
 	Models []string `json:"models,omitempty"`
 	// Permissions defines key permissions
 	Permissions map[string]string `json:"permissions,omitempty"`
@@ -133,7 +133,7 @@ type VirtualKeyStatus struct {
 	MaxBudget string `json:"maxBudget,omitempty"`
 	// MaxParallelRequests limits concurrent requests
 	MaxParallelRequests int `json:"maxParallelRequests,omitempty"`
-	// Models specifies which models can be used
+	// Models specifies which models can be used. Omit to allow all models; use empty list for no model access.
 	Models []string `json:"models,omitempty"`
 	// Permissions defines key permissions
 	Permissions map[string]string `json:"permissions,omitempty"`

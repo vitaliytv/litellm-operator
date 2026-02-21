@@ -191,7 +191,8 @@ spec:
                 description: ModelTPMLimit sets TPM limits per model
                 type: object
               models:
-                description: Models specifies which models can be used
+                description: Models specifies which models can be used. Omit to allow
+                  all models; use empty list for no model access.
                 items:
                   type: string
                 type: array
@@ -369,7 +370,8 @@ spec:
                 description: MaxParallelRequests limits concurrent requests
                 type: integer
               models:
-                description: Models specifies which models can be used
+                description: Models specifies which models can be used. Omit to allow
+                  all models; use empty list for no model access.
                 items:
                   type: string
                 type: array
