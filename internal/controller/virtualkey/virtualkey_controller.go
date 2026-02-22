@@ -389,8 +389,11 @@ func (r *VirtualKeyReconciler) convertToVirtualKeyRequest(virtualKey *authv1alph
 
 	// Omit (field not set) → do not set request.Models (nil) → API omits "models" → all models allowed.
 	// Explicit empty list (models: []) → set request.Models = [] → API sends "models": [] → no model access.
+	// Copy slice so the request does not share memory with Spec (callers may mutate Spec later).
 	if virtualKey.Spec.Models != nil {
-		virtualKeyRequest.Models = virtualKey.Spec.Models
+		modelsCopy := make([]string, len(virtualKey.Spec.Models))
+		copy(modelsCopy, virtualKey.Spec.Models)
+		virtualKeyRequest.Models = &modelsCopy
 	}
 
 	if virtualKey.Spec.MaxBudget != "" {

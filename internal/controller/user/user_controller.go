@@ -344,8 +344,11 @@ func (r *UserReconciler) convertToUserRequest(user *authv1alpha1.User) (litellm.
 
 	// Omit (models not set) → do not send "models" to API → LiteLLM allows all models.
 	// Explicit empty list (models: []) → send "models": [] → user has no model access.
+	// Copy slice so the request does not share memory with Spec (callers may mutate Spec later).
 	if user.Spec.Models != nil {
-		userRequest.Models = user.Spec.Models
+		modelsCopy := make([]string, len(user.Spec.Models))
+		copy(modelsCopy, user.Spec.Models)
+		userRequest.Models = &modelsCopy
 	}
 
 	if user.Spec.MaxBudget != "" {

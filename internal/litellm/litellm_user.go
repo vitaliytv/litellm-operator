@@ -37,7 +37,7 @@ type UserRequest struct {
 	ModelMaxBudget       map[string]string `json:"model_max_budget,omitempty"`
 	ModelRPMLimit        map[string]string `json:"model_rpm_limit,omitempty"`
 	ModelTPMLimit        map[string]string `json:"model_tpm_limit,omitempty"`
-	Models               []string          `json:"models"`
+	Models               *[]string         `json:"models,omitempty"`
 	Permissions          map[string]string `json:"permissions,omitempty"`
 	RPMLimit             int               `json:"rpm_limit,omitempty"`
 	SendInviteEmail      bool              `json:"send_invite_email,omitempty"`
@@ -269,7 +269,12 @@ func (l *LitellmClient) IsUserUpdateNeeded(ctx context.Context, user *UserRespon
 	checkField("guardrails", "Guardrails", user.Guardrails, req.Guardrails, true, true)
 	checkField("max_budget", "MaxBudget", user.MaxBudget, req.MaxBudget, false, false)
 	checkField("max_parallel_requests", "MaxParallelRequests", user.MaxParallelRequests, req.MaxParallelRequests, false, true)
-	checkField("models", "Models", user.Models, req.Models, true, false)
+	// Use reflect.DeepEqual for Models so nil ("all models") and [] ("no model access") are distinguished.
+	var reqModels []string
+	if req.Models != nil {
+		reqModels = *req.Models
+	}
+	checkField("models", "Models", user.Models, reqModels, false, false)
 	checkField("permissions", "Permissions", user.Permissions, req.Permissions, true, false)
 	checkField("rpm_limit", "RPMLimit", user.RPMLimit, req.RPMLimit, false, true)
 	checkField("send_invite_email", "SendInviteEmail", user.SendInviteEmail, req.SendInviteEmail, false, true)

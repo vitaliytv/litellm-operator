@@ -543,14 +543,15 @@ var _ = Describe("VirtualKey Controller", func() {
 			request, err := reconciler.convertToVirtualKeyRequest(virtualKey)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(request.Models).NotTo(BeNil())
-			Expect(request.Models).To(HaveLen(0))
+			Expect(*request.Models).To(HaveLen(0))
 		})
 
 		It("models list set → same list in request", func() {
 			virtualKey.Spec.Models = []string{"gpt-4", "gpt-3.5-turbo"}
 			request, err := reconciler.convertToVirtualKeyRequest(virtualKey)
 			Expect(err).NotTo(HaveOccurred())
-			Expect(request.Models).To(Equal([]string{"gpt-4", "gpt-3.5-turbo"}))
+			Expect(request.Models).NotTo(BeNil())
+			Expect(*request.Models).To(Equal([]string{"gpt-4", "gpt-3.5-turbo"}))
 		})
 
 		It("all three models cases produce different results", func() {
@@ -565,13 +566,14 @@ var _ = Describe("VirtualKey Controller", func() {
 			reqEmpty, err := reconciler.convertToVirtualKeyRequest(virtualKey)
 			Expect(err).NotTo(HaveOccurred())
 			Expect(reqEmpty.Models).NotTo(BeNil())
-			Expect(reqEmpty.Models).To(HaveLen(0))
+			Expect(*reqEmpty.Models).To(HaveLen(0))
 
 			// Non-empty list: request.Models must be the same slice
 			virtualKey.Spec.Models = []string{"gpt-4"}
 			reqList, err := reconciler.convertToVirtualKeyRequest(virtualKey)
 			Expect(err).NotTo(HaveOccurred())
-			Expect(reqList.Models).To(Equal([]string{"gpt-4"}))
+			Expect(reqList.Models).NotTo(BeNil())
+			Expect(*reqList.Models).To(Equal([]string{"gpt-4"}))
 
 			// All three outcomes must differ: nil vs [] vs [gpt-4]
 			Expect(reqOmit.Models).NotTo(Equal(reqEmpty.Models))

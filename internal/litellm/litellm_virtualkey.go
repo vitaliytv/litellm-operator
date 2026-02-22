@@ -39,7 +39,7 @@ type VirtualKeyRequest struct {
 	ModelMaxBudget       map[string]string `json:"model_max_budget,omitempty"`
 	ModelRPMLimit        map[string]int    `json:"model_rpm_limit,omitempty"`
 	ModelTPMLimit        map[string]int    `json:"model_tpm_limit,omitempty"`
-	Models               []string          `json:"models"`
+	Models               *[]string         `json:"models,omitempty"`
 	Permissions          map[string]string `json:"permissions,omitempty"`
 	RPMLimit             int               `json:"rpm_limit,omitempty"`
 	SendInviteEmail      bool              `json:"send_invite_email,omitempty"`
@@ -297,7 +297,12 @@ func (l *LitellmClient) IsVirtualKeyUpdateNeeded(ctx context.Context, virtualKey
 		log.Info("MaxParallelRequests changed")
 		return true
 	}
-	if !cmp.Equal(virtualKey.Models, req.Models, cmpopts.EquateEmpty()) {
+	// Compare Models without EquateEmpty so nil ("all models") and [] ("no models") are distinguished.
+	var reqModels []string
+	if req.Models != nil {
+		reqModels = *req.Models
+	}
+	if !cmp.Equal(virtualKey.Models, reqModels) {
 		log.Info("Models changed")
 		return true
 	}
