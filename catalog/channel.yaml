@@ -1,0 +1,5 @@
+schema: olm.channel
+package: litellm-operator
+name: alpha
+entries:
+  - name: litellm-operator.v0.21.0-vitaliytv.1

@@ -1,0 +1,3 @@
+schema: olm.package
+name: litellm-operator
+defaultChannel: alpha

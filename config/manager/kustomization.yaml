@@ -3,6 +3,6 @@ resources:
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 images:
-- name: controller
-  newName: ghcr.io/palenaai/litellm-operator
-  newTag: v0.21.0
+- digest: sha256:af2bd6473fbf8deabd9586e046a534af23350d194da9687d7c33f469e72f3869
+  name: controller
+  newName: ghcr.io/vitaliytv/litellm-operator
