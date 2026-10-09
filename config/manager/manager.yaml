@@ -30,8 +30,11 @@ spec:
         control-plane: controller-manager
         app.kubernetes.io/name: litellm-operator
     spec:
+      # Select by labels, not by node pool name: replacing or renaming a GKE
+      # node pool must not leave the controller Pending. preem=false marks
+      # on-demand (non-Spot) nodes in the target cluster.
       nodeSelector:
-        cloud.google.com/gke-nodepool: general-arm64
+        preem: "false"
         kubernetes.io/arch: arm64
       tolerations:
         - key: kubernetes.io/arch
